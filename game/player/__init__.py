@@ -14,23 +14,62 @@ from game.deck import CardHolder
 
 
 class Spectator(DataModelController):
+    """Spectating user.
+
+    Class Properties:
+        :type MODEL_RULES: dict -- The rule set for the underlying `DataModel`.
+
+    Init Parameters:
+        user -- The `User` object.
+
+    Properties:
+        :type name: str -- The profile name of the user.
+        :type user: User -- The user.
+    """
 
     @classproperty
     def MODEL_RULES(cls):
+        """Rules for the DataModel.
+
+        New Model Keys:
+            :key name: str -- The profile name of the user.
+            :key user: DataModel -- The user data.
+        """
         return {
             'name': ('name', str, None),
             'user': ('user', DataModel, lambda x: x.model)
         }
 
     def __init__(self, user):
+        """Spectator init.
+
+        :param user: User -- The user.
+        """
         self.name, self.user = user.profile_name, user
         super(Spectator, self).__init__(self.__class__.MODEL_RULES)
 
 
 class Player(Spectator):
+    """Game player.
+
+    Init Parameters:
+        user -- The user object.
+        team -- The player's team.
+
+    Properties:
+        :type team: str -- The player's team identifier.
+    """
 
     @classproperty
     def MODEL_RULES(cls):
+        """Rules for the DataModel.
+
+        New Model Keys:
+            :key hand: DataModel -- Model representating the player's
+                `CardContainer` or hand.
+            :key team: str -- Player's team identifier.
+            :key player_id: int -- The unique Player ID.
+        """
         old_rules = super(Player, cls).MODEL_RULES
         old_rules['hand'] = ('hand', DataModel, lambda x: x.model)
         old_rules['team'] = ('team', str, None)
@@ -38,6 +77,11 @@ class Player(Spectator):
         return old_rules
 
     def __init__(self, user, team):
+        """Player init.
+
+        :param user: User -- The user.
+        :param team: str -- The team identifier.
+        """
         self.team = team
         self.hand = CardHolder(None, 'suit')
         self.player_id = id(self)  # TODO: Player ID generator
