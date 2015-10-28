@@ -40,6 +40,7 @@ class CardHolder(DataModelController):
         insert_card -- Insert new card into sorted/specified order.
         sort -- Sort entire card list.
         shuffle -- Shuffle entire card list.
+        dump_cards -- Dump entire card list.
 
     """
 
@@ -122,6 +123,13 @@ class CardHolder(DataModelController):
         if changed:
             self.sort()
 
+    def remove_card(self, card):
+        if type(card) is int:
+            card = self.cards.index(card)
+        if not card:
+            raise ValueError("Card not found in holder.")
+        self.cards.remove(card)
+
     def append_card(self, card):
         """Add card to end of cards holder. Does not sort.
 
@@ -168,6 +176,18 @@ class CardHolder(DataModelController):
         """Shuffle cards list."""
         random.shuffle(self.cards)
         self._update_model('cards')
+
+    def dump_cards(self):
+        """Dump cards list.
+
+        :return: list -- Dumped cards.
+        """
+        cards = self.cards
+        self.cards = []
+        return cards
+
+    def __iter__(self):
+        return (card for card in self.cards)
 
 
 
