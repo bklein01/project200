@@ -27,10 +27,10 @@ class CardHolder(DataModelController):
         ascending_order -- Ascending/descending sort option.
 
     Properties:
-        :type self.cards: list -- List of held cards.
-        :type self.sort_method: str | None -- The name of the sort method to use.
-        :type self.sort_ascend: bool -- Whether to sort in ascending order.
-        :type self.card_count: int -- The number of cards currently held.
+        :type cards: list -- List of held cards.
+        :type sort_method: str | None -- The name of the sort method to use.
+        :type sort_ascend: bool -- Whether to sort in ascending order.
+        :type card_count: int -- The number of cards currently held.
 
     Public Methods:
         change_sort -- Update sorting rules.

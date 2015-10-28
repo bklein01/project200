@@ -24,6 +24,10 @@ class Card(DataModelController):
     Init Parameters:
         suit -- The suit of the card.
         value -- The face value of the card.
+
+    Properties:
+        :type suit: Card.Value/int -- The suit of the card.
+        :type value: Card.Suit/int -- The card face value.
     """
 
     Suit = EnumInt('DIAMONDS', 'CLUBS', 'HEARTS', 'SPADES')
