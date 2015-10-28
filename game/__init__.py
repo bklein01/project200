@@ -13,16 +13,20 @@ from core.enum import Enum
 from core.exceptions import StateError
 from game.thdeck import THDeckOriginal, THDeckSixes
 from game.table import Table
-from game.player import Player
+from game.player import Player, Spectator
 # from core.decorators import classproperty
 
 
 class Game(DataModelController):
 
     State = Enum('Created', 'Ready', 'Running', 'Paused')
+    SpecMode = Enum('NoSpectators', 'Standard', 'ActivePlayer', 'AllInfo')
 
     DEFAULT_OPTIONS = DotDict({
-        'sixes': False
+        'sixes': False,
+        'spec_mode': 'Standard',
+        'spec_allow_chat': True,
+        'spec_max': 4
     })
 
     # noinspection PyCallByClass,PyTypeChecker
@@ -32,7 +36,9 @@ class Game(DataModelController):
         'owner_id': ('creator', int, lambda x: x.id),
         'state': ('state', str, None),
         'table': ('table', DataModel, lambda x: x.model),
-        'points': ('points', Collection.Dict(int), None)
+        'points': ('points', Collection.Dict(int), None),
+        'spectators': ('spectators', Collection.List(DataModel),
+                       lambda x: x.model)
     }
 
     def __init__(self, creating_user, options=None):
@@ -45,6 +51,7 @@ class Game(DataModelController):
         self.points = {'A': 0, 'B': 0}
         self.table = None
         self.state = Game.State.Created
+        self.spectators = []
         super(Game, self).__init__(self.__class__.MODEL_RULES)
 
     def new_game(self):
@@ -55,21 +62,27 @@ class Game(DataModelController):
         else:
             deck = THDeckOriginal()
         self.table = Table(self.game_id, self.players, deck)
+        self.table.on_change('*', (
+            lambda model, key, instruction:
+                self._call_listener('table', instruction, {'property': key})))
         self.state = Game.State.Running
 
     def remove_player(self, p):
+        index = self.players.index(p)
         self.players.remove(p)
+        self._update_model_collection('players', {'action': 'remove',
+                                                  'index': index})
         if self.state is Game.State.Running:
             self.table.pause()
             self.state = Game.State.Paused
         elif self.state is Game.State.Ready:
             self.state = Game.State.Created
 
-    def remove_player_by_user(self, user):
+    def remove_player_by_user_id(self, user_id):
         for p in self.players:
-            if p.user_data.user_id == user.user_id:
+            if p.user.user_id == user_id:
                 return self.remove_player(p)
-        raise ValueError("User has no player in this game.")
+        raise ValueError("User is not a player in this game.")
 
     def add_player(self, user, team):
         if self.state not in [Game.State.Created, Game.State.Paused]:
@@ -86,6 +99,28 @@ class Game(DataModelController):
                 self.table.resume()
             else:
                 self.state = Game.State.Ready
+
+    def add_spectator(self, user):
+        if self.options.spec_mode is Game.SpecMode.NoSpectators:
+            raise StateError("This game does not allow spectators.")
+        if len(self.spectators) >= self.options.spec_max:
+            raise StateError("This game has reached the max allowed "
+                             "spectators.")
+        self.spectators.append(Spectator(user))
+        self._update_model_collection('spectators', {'action': 'append'})
+
+    def remove_spectator(self, spec):
+        index = self.spectators.index(spec)
+        self.spectators.remove(spec)
+        self._update_model_collection('spectators', {'action': 'remove',
+                                                     'index': index})
+
+    def remove_spectator_by_user_id(self, user_id):
+        for spec in self.spectators:
+            if spec.user.user_id == user_id:
+                return self.remove_spectator(spec)
+        raise ValueError("User is not a spectator in this game.")
+
 
 
 # ----------------------------------------------------------------------------
