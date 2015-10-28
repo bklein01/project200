@@ -1,5 +1,5 @@
 # project200
-## A multi-platform 200 card game.
+###### A multi-platform 200 card game.
 
 
 Game Information
