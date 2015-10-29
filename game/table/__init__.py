@@ -28,7 +28,8 @@ class Table(DataModelController):
 
     Properties:
         :type game_id: -- The unique ID of the parent Game object.
-        :type kitty: list -- The table's kitty (played cards for the round).
+        :type kitty: list -- The table's kitty (extra cards for highest bidder).
+        :type active: list -- The cards played for each round.
         :type players: list -- Table's player IDs.
         :type discards: dict -- The team's discard piles.
         :type bet_team: str -- The team with the highest/winning bid.
@@ -50,6 +51,7 @@ class Table(DataModelController):
         'deck': ('deck', DataModel, lambda x: x.model),
         'players': ('players', list, None),
         'kitty': ('kitty', Collection.List, lambda x: x.model),
+        'active': ('active', Collection.List, lambda x: x.model),
         'discards': ('discards', Collection.Dict(DataModel), lambda x: x.model),
         'game_id': ('game_id', int, None),
         'state': ('state', str, None),
@@ -67,7 +69,7 @@ class Table(DataModelController):
         """
         self.game_id, self.deck = game_id, deck
         self.players = [player.player_id for player in players]
-        self.kitty = [None] * 4
+        self.kitty, self.active = [None] * 4, [None] * 4
         self.discards = {
             'A': CardHolder(None, 'value'),
             'B': CardHolder(None, 'value')

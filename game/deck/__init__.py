@@ -57,7 +57,6 @@ class Deck(CardHolder):
             for suit in Card.Suit:
                 cards += [Card(suit, val) for val in default[suit]]
         super(Deck, self).__init__(cards)
-        self.shuffle()
 
     def _pop_card(self):
         """Pop card of top of deck.
