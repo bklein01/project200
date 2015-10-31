@@ -20,10 +20,9 @@ class Card(ImmutableDotDict):
         :type Suit: EnumInt -- Enumerated card Suit types.
         :type Value: EnumInt -- Enumerated card values.
 
-    Init Keyword Parameters:
-        suit -- The suit of the card.
-        value -- The face value of the card.
-        card -- The card dict, rather than individual suit and value.
+    Init Parameters:
+        card_or_suit -- The card dict or the suit of the card.
+        value -- If suit provided, the face value of the card.
 
     Properties:
         :type suit: Card.Value/int -- The suit of the card.
@@ -35,21 +34,21 @@ class Card(ImmutableDotDict):
     Value = EnumInt('JOKER', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN',
                     'EIGHT', 'NINE', 'TEN', 'JACK', 'QUEEN', 'KING', 'ACE')
 
-    def __init__(self, **kwargs):
+    def __init__(self, card_or_suit, value=None):
         """Card init.
 
-        :param suit: Card.Suit/int -- The card suit.
-        :param value: Card.Value/int -- The card face value.
+        :param card_or_suit: Card.Suit/int | dict -- The card dict or the
+            suit of the card.
+        :param value: Card.Value/int | None -- If suit provided, the face
+            value of the card.
         """
-        if 'card' in kwargs:
-            super(Card, self).__init__(kwargs['card'])
-        elif 'value' in kwargs and 'suit' in kwargs:
-            super(Card, self).__init__({
-                'suit': kwargs['suit'],
-                'value': kwargs['value']
-            })
+        if not value:
+            super(Card, self).__init__(card_or_suit)
         else:
-            raise InitError('Card requires either card or suit,value args.')
+            super(Card, self).__init__({
+                'suit': card_or_suit,
+                'value': value
+            })
 
     def __setattr__(self, key, value):
         if hasattr(self, key):

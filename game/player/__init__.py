@@ -40,26 +40,32 @@ class Spectator(DataModelController):
             :key name: str -- The profile name of the user.
             :key user: DataModel -- The user data.
         """
-        return {
+        rules = super(Spectator, cls).MODEL_RULES
+        rules.update({
             'name': ('name', str, None),
-            'user': ('user', DataModel, lambda x: x.model)
-        }
+            'user_id': ('user', str, lambda x: x.uid)
+        })
+        return rules
 
     @classmethod
-    def load(cls, model):
-        user = User.load()
+    def new(cls, user, data_store, **kwargs):
+        kwargs.update({
+            'name': user.profile_name,
+            'user': user
+        })
+        return super(Spectator, cls).new(data_store, **kwargs)
 
     @classmethod
-    def get(cls, player_id):
-        pass
-
-    def __init__(self, user):
-        """Spectator init.
-
-        :param user: User -- The user.
-        """
-        self.name, self.user = user.profile_name, user
-        super(Spectator, self).__init__(self.__class__.MODEL_RULES)
+    def restore(cls, data_model, data_store, **kwargs):
+        ctrl = data_store.get_controller(cls, data_model.uid)
+        if not ctrl:
+            kwargs.update({
+                'name': data_model.name,
+                'user': User.get(data_model.user_id, data_store)
+            })
+            ctrl = super(Spectator, cls).restore(data_model, data_store,
+                                                 **kwargs)
+        return ctrl
 
 
 class Player(Spectator):
@@ -83,22 +89,47 @@ class Player(Spectator):
             :key team: str -- Player's team identifier.
             :key player_id: int -- The unique Player ID.
         """
-        old_rules = super(Player, cls).MODEL_RULES
-        old_rules['hand'] = ('hand', DataModel, lambda x: x.model)
-        old_rules['team'] = ('team', str, None)
-        old_rules['player_id'] = ('player_id', int, None)
-        return old_rules
+        rules = super(Player, cls).MODEL_RULES
+        rules.update({
+            'hand': ('hand', DataModel, lambda x: x.model),
+            'team': ('team', str, None),
+            'abandoned': ('abandoned', bool, None)
+        })
+        return rules
 
-    def __init__(self, user, team):
-        """Player init.
+    @classproperty
+    def INIT_DEFAULTS(cls):
+        defaults = super(Player, cls).INIT_DEFAULTS
+        defaults.update({
+            'abandoned': False
+        })
+        return defaults
 
-        :param user: User -- The user.
-        :param team: str -- The team identifier.
-        """
-        self.team = team
-        self.hand = CardHolder(None, 'suit')
-        self.player_id = id(self)  # TODO: Player ID generator
-        super(Player, self).__init__(user)
+    @classmethod
+    def restore(cls, data_model, data_store, **kwargs):
+        ctrl = data_store.get_controller(cls, data_model.uid)
+        if ctrl:
+            return ctrl
+        kwargs.update({
+            'team': data_model.team,
+            'hand': CardHolder.restore(data_model.hand, data_store),
+            'abandoned': data_model.abandoned
+        })
+        return super(Player, cls).restore(data_model, data_store, **kwargs)
+
+    @classmethod
+    def new(cls, user, team, data_store, **kwargs):
+        kwargs.update({
+            'team': team,
+            'hand': CardHolder.new(None, 'suit', data_store)
+        })
+        return super(Player, cls).new(user, data_store, **kwargs)
+
+    def new_user(self, user):
+        if not self.abandoned:
+            raise ValueError('Cannot change user of unabandoned player.')
+        self.user = user
+        self.abandoned = False
 
 # ----------------------------------------------------------------------------
 __version__ = 0.1

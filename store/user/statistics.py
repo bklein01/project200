@@ -8,43 +8,76 @@ Exports:
 
 import math
 from core.datamodel import DataModelController, Collection
+from core.decorators import classproperty
 
 
 class UserStatistics(DataModelController):
 
-    MODEL_RULES = {
-        'games_won': ('games_won', int, None),
-        'games_lost': ('games_lost', int, None),
-        'history': ('history', Collection.List(int), None),
-        'twofers': ('twofers', int, None),
-        'won_bet_rounds': ('won_bet_rounds', int, None),
-        'lost_bet_rounds': ('lost_bet_rounds', int, None),
-        'won_counter_rounds': ('won_counter_rounds', int, None),
-        'lost_counter_rounds': ('lost_counter_rounds', int, None),
-        'avg_win_bet': ('avg_bet_win', int, None),
-        'avg_counter_win': ('avg_counter_win', int, None),
-        'team_mates': ('team_mates', Collection.Dict(list), None),
-        'elo': ('elo', float, None),
-        'rank': ('rank', int, None),
-        'ranked_wins': ('ranked_wins', int, None)
-    }
+    @classproperty
+    def MODEL_RULES(cls):
+        rules = super(UserStatistics, cls).MODEL_RULES
+        rules.update({
+            'games_won': ('games_won', int, None),
+            'games_lost': ('games_lost', int, None),
+            'history': ('history', Collection.List(int), None),
+            'twofers': ('twofers', int, None),
+            'won_bet_rounds': ('won_bet_rounds', int, None),
+            'lost_bet_rounds': ('lost_bet_rounds', int, None),
+            'won_counter_rounds': ('won_counter_rounds', int, None),
+            'lost_counter_rounds': ('lost_counter_rounds', int, None),
+            'avg_win_bet': ('avg_bet_win', int, None),
+            'avg_counter_win': ('avg_counter_win', int, None),
+            'team_mates': ('team_mates', Collection.Dict(list), None),
+            'elo': ('elo', float, None),
+            'rank': ('rank', int, None),
+            'ranked_wins': ('ranked_wins', int, None)
+        })
+        return rules
 
-    def __init__(self, games_won=0, games_lost=0, history=None, twofers=0,
-                 won_bet_rounds=0, lost_bet_rounds=0, won_counter_rounds=0,
-                 lost_counter_rounds=0, avg_win_bet=0, avg_counter_win=0,
-                 elo=800.0, rank=1, ranked_wins=0, team_mates=None):
-        if not history:
-            history = []
-        if not team_mates:
-            team_mates = {}
-        (self.games_won, self.games_lost, self.history, self.twofers,
-         self.won_bet_rounds, self.lost_bet_rounds, self.won_counter_rounds,
-         self.lost_counter_rounds, self.avg_win_bet, self.avg_counter_win,
-         self.elo, self.rank, self.ranked_wins, self.team_mates) = (
-            games_won, games_lost, history, twofers, won_bet_rounds,
-            lost_bet_rounds, won_counter_rounds, lost_counter_rounds,
-            avg_win_bet, avg_counter_win, elo, rank, ranked_wins, team_mates)
-        super(UserStatistics, self).__init__(self.__class__.MODEL_RULES)
+    @classproperty
+    def INIT_DEFAULTS(cls):
+        defaults = super(UserStatistics, cls).INIT_DEFAULTS
+        defaults.update({
+            'games_won': 0,
+            'games_lost': 0,
+            'history': [],
+            'twofers': 0,
+            'won_bet_rounds': 0,
+            'lost_bet_rounds': 0,
+            'won_counter_rounds': 0,
+            'lost_counter_rounds': 0,
+            'avg_win_bet': 0,
+            'avg_counter_win': 0,
+            'elo': 800.0,
+            'rank': 1,
+            'ranked_win': 0,
+            'team_mates': {}
+        })
+        return defaults
+
+    @classmethod
+    def restore(cls, data_model, data_store, **kwargs):
+        ctrl = data_store.get_controller(cls, data_model.uid)
+        if not ctrl:
+            kwargs.update({
+                'games_won': data_model.games_won,
+                'games_lost': data_model.games_lost,
+                'history': data_model.history,
+                'twofers': data_model.twofers,
+                'won_bet_rounds': data_model.won_bet_rounds,
+                'lost_bet_rounds': data_model.lost_bet_rounds,
+                'won_counter_rounds': data_model.won_counter_rounds,
+                'lost_counter_rounds': data_model.lost_counter_rounds,
+                'avg_win_bet': data_model.avg_win_bet,
+                'avg_counter_win': data_model.avg_counter_win,
+                'elo': data_model.elo,
+                'rank': data_model.rank,
+                'ranked_wins': data_model.ranked_wins,
+                'team_mates': data_model.team_mates
+            })
+            ctrl = super(UserStatistics, cls).restore(
+                data_model, data_store, **kwargs)
+        return ctrl
 
     def won_bet_round(self, bet):
         self.avg_win_bet = _avg(self.won_bet_rounds,

@@ -99,8 +99,8 @@ class Game(DataModelController):
 
     # noinspection PyMethodOverriding
     @classmethod
-    def new(cls, creating_user, data_store, options=None):
-        ctrl = super(Game, cls).new(data_store)
+    def new(cls, creating_user, data_store, options=None, **kwargs):
+        ctrl = super(Game, cls).new(data_store, **kwargs)
         ctrl.options.update(options)
         ctrl.add_player(creating_user, 'A')
         return ctrl

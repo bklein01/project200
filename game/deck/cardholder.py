@@ -44,22 +44,6 @@ class CardHolder(DataModelController):
 
     """
 
-    # noinspection PyPep8Naming,PyMethodParameters,PyCallByClass,PyTypeChecker
-    @classproperty
-    def MODEL_RULES(cls):
-        """The rule set for the underlying `DataModel`.
-
-        New Model Keys:
-            :key cards: Collection.List(DataModel) -- The list of cards.
-            :key sort: str | None -- The sorting compare method name.
-            :key ascend: bool -- Sorting option for ascending order.
-        """
-        return {
-            'cards': ('cards', Collection.List(dict), lambda x: dict(x)),
-            'sort': ('sort_method', None, None),
-            'ascend': ('sort_ascend', bool, None)
-        }
-
     SORT_COMP_METHODS = {
         'suit':
             (lambda a, b: -1 if a.suit < b.suit
@@ -75,18 +59,45 @@ class CardHolder(DataModelController):
                 else 0)
     }
 
-    def __init__(self, cards=None, sort_method=None, ascending_order=False):
-        """CardHolder init.
+    # noinspection PyPep8Naming,PyMethodParameters,PyCallByClass,PyTypeChecker
+    @classproperty
+    def MODEL_RULES(cls):
+        """The rule set for the underlying `DataModel`.
 
-        :param cards: list -- Optional list of cards to init with.
-        :param sort_method: str -- Optional method with which to sort cards.
-        :param ascending_order: bool -- Ascending/descending sort option.
+        New Model Keys:
+            :key cards: Collection.List(DataModel) -- The list of cards.
+            :key sort: str | None -- The sorting compare method name.
+            :key ascend: bool -- Sorting option for ascending order.
         """
-        if cards is None:
-            cards = []
-        self.cards = cards
-        self.sort_method, self.sort_ascend = sort_method, ascending_order
-        super(CardHolder, self).__init__(self.__class__.MODEL_RULES)
+        rules = super(CardHolder, cls).MODEL_RULES
+        rules.update({
+            'cards': ('cards', Collection.List(dict), lambda x: dict(x)),
+            'sort': ('sort_method', None, None),
+            'ascend': ('sort_ascend', bool, None)
+        })
+        return rules
+
+    @classproperty
+    def INIT_DEFAULTS(cls):
+        defaults = super(CardHolder, cls).INIT_DEFAULTS
+        defaults.update({
+            'ascend': False,
+            'sort': None
+        })
+        return defaults
+
+    @classmethod
+    def restore(cls, data_model, data_store, **kwargs):
+        ctrl = data_store.get_controller(cls, data_model.uid)
+        if not ctrl:
+            kwargs.update({
+                'cards': [Card(c) for c in data_model.cards],
+                'sort': data_model.sort_method,
+                'sort_ascend': data_model.sort_ascend
+            })
+            ctrl = super(CardHolder, cls).restore(data_model, data_store,
+                                                  **kwargs)
+        return ctrl
 
     @property
     def card_count(self):

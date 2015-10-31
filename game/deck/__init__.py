@@ -46,17 +46,18 @@ class Deck(CardHolder):
                                  if value is not Card.Value.JOKER]
         }
 
-    def __init__(self, cards=None):
-        """Deck init.
-
-        :param cards: list | None - Optional list of cards to init with.
-        """
-        if cards is None:
-            default = self.__class__.DEFAULT_DECK
-            cards = []
-            for suit in Card.Suit:
-                cards += [Card(suit, val) for val in default[suit]]
-        super(Deck, self).__init__(cards)
+    @classmethod
+    def new(cls, data_store, **kwargs):
+        defaults = cls.DEFAULT_DECK
+        cards = []
+        for suit in Card.Suit:
+            cards += [Card(suit, val) for val in defaults[suit]]
+        kwargs.update({
+            'cards': cards
+        })
+        ctrl = super(Deck, cls).new(data_store, **kwargs)
+        ctrl.shuffle()
+        return ctrl
 
     def _pop_card(self):
         """Pop card of top of deck.
