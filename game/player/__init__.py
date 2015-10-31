@@ -11,6 +11,7 @@ Exports:
 from core.datamodel import DataModelController, DataModel
 from core.decorators import classproperty
 from game.deck import CardHolder
+from store.user import User
 
 
 class Spectator(DataModelController):
@@ -18,6 +19,10 @@ class Spectator(DataModelController):
 
     Class Properties:
         :type MODEL_RULES: dict -- The rule set for the underlying `DataModel`.
+
+    Class Methods:
+        load -- Load new Game object from existing DataModel.
+        get -- Load new Game object from existing game_id.
 
     Init Parameters:
         user -- The `User` object.
@@ -39,6 +44,14 @@ class Spectator(DataModelController):
             'name': ('name', str, None),
             'user': ('user', DataModel, lambda x: x.model)
         }
+
+    @classmethod
+    def load(cls, model):
+        user = User.load()
+
+    @classmethod
+    def get(cls, player_id):
+        pass
 
     def __init__(self, user):
         """Spectator init.

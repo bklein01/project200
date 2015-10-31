@@ -55,7 +55,7 @@ class CardHolder(DataModelController):
             :key ascend: bool -- Sorting option for ascending order.
         """
         return {
-            'cards': ('cards', Collection.List(DataModel), lambda x: x.model),
+            'cards': ('cards', Collection.List(dict), lambda x: dict(x)),
             'sort': ('sort_method', None, None),
             'ascend': ('sort_ascend', bool, None)
         }
