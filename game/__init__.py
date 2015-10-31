@@ -8,14 +8,14 @@ Exports:
 """
 
 from core.datamodel import DataModelController, Collection, DataModel
-from core.dotdict import ImmutableDotDict, DotDict
+from core.dotdict import DotDict
 from core.enum import Enum
 from core.exceptions import StateError
 from game.thdeck import THDeckOriginal, THDeckSixes
 from game.table import Table
 from game.player import Player, Spectator
+from game.deck.card import Card
 from core.decorators import classproperty
-from store import ModelStore as DataStore
 
 
 # noinspection PyAttributeOutsideInit
@@ -57,7 +57,7 @@ class Game(DataModelController):
 
     """
 
-    State = Enum('CREATED', 'READY', 'RUNNING', 'PAUSED')
+    State = Enum('CREATED', 'READY', 'RUNNING', 'PAUSED', 'END')
     SpecMode = Enum('NOSPEC', 'STANDARD', 'ACTIVE', 'ALL')
 
     DEFAULT_OPTIONS = {
@@ -136,17 +136,71 @@ class Game(DataModelController):
 
         :raise: StateError if `Game` is not `Ready`.
         """
-        if self.state is not Game.State.READY:
+        if self.state in (Game.State.READY, Game.State.END):
             raise StateError("Cannot start game while in state: " + self.state)
         if self.options.sixes:
-            deck = THDeckSixes()
+            deck = THDeckSixes.new(self._data_store)
         else:
-            deck = THDeckOriginal()
+            deck = THDeckOriginal.new(self._data_store)
+        self.points = {'A': 0, 'B': 0}
         self.table = Table(self.players, deck)
         self.table.on_change('*', (
             lambda model, key, instruction:
                 self._call_listener('table', instruction, {'property': key})))
+        self.table.on_change('state', (
+            lambda model, key, instruction:
+                self._table_round_end(model)
+                if model.state is Table.State.END else 0))
         self.state = Game.State.RUNNING
+
+    def _table_round_end(self, model):
+        scores = {
+            'A': _points_calc(model.discards['A'].cards),
+            'B': _points_calc(model.discards['B'].cards)
+        }
+        if scores[model.bet_team] >= model.bet_amount:
+            # bet round win
+            for p in self.players:
+                if p.team is model.bet_team:
+                    p.statistics.won_bet_round(model.bet_amount)
+                else:
+                    p.statistics.lost_counter_round()
+            self._update_points(**scores)
+        else:
+            # counter round win
+            s = scores[model.bet_team]
+            for p in self.players:
+                if p.team is model.bet_team:
+                    p.statistics.lost_bet_round()
+                else:
+                    p.statistics.won_counter_round(100 - s)
+            scores[model.bet_team] = -1 * model.bet_amount
+            self._update_points(**scores)
+        if self.points['A'] >= 200:
+            self._end_game('A')
+        elif self.points['B'] >= 200:
+            self._end_game('B')
+        else:
+            self.table.restart()
+
+    def _end_game(self, winning_team):
+        losing_team = 'B' if winning_team is 'A' else 'A'
+        teams = {
+            'A': [p for p in self.players if p.team is 'A'],
+            'B': [p for p in self.players if p.team is 'B']
+        }
+        elos = {
+            'A': _avg_elo(*teams['A']),
+            'B': _avg_elo(*teams['B'])
+        }
+        for i in xrange(2):
+            teams[winning_team][i].statistics.update_casual_game_stats(
+                self.uid, teams[winning_team][(i + 1) % 2].uid,
+                elos[losing_team], True)
+            teams[losing_team][i].statistics.update_casual_game_stats(
+                self.uid, teams[losing_team][(i + 1) % 2].uid,
+                elos[winning_team], False)
+        self.state = Game.State.END
 
     def remove_player(self, p):
         """Removes player from game.
@@ -157,7 +211,7 @@ class Game(DataModelController):
             p.abandoned = True
             self.table.pause()
             self.state = Game.State.PAUSED
-        elif self.state is Game.State.READY:
+        elif self.state in (Game.State.READY, Game.State.END):
             index = self.players.index(p)
             self.players.remove(p)
             Player.delete(p.uid, self._data_store)
@@ -239,6 +293,30 @@ class Game(DataModelController):
             if spec.user.uid == user_id:
                 return self.remove_spectator(spec)
         raise ValueError("User is not a spectator in this game.")
+
+
+def _points_calc(cards):
+    """Calculate team score from discard pile.
+
+    Counts 5 points for every `FIVE` and 10 points for every `ACE` or `TEN`.
+
+    :param cards: The team's discard pile.
+    :return: int -- Team's final score.
+    """
+    return sum([5 if c.value is Card.Value.FIVE else
+                10 if c.value in (Card.Value.TEN, Card.Value.ACE) else
+                0 for c in cards])
+
+
+def _avg_elo(*args):
+    elo = 0.0
+    games = 0
+    for p in args:
+        _games = p.statistics.games_won + p.statistics.games_lost
+        elo += p.statistics.elo * _games
+        games += _games
+    return elo / games
+
 
 # ----------------------------------------------------------------------------
 __version__ = 0.1

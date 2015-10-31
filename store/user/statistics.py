@@ -30,7 +30,8 @@ class UserStatistics(DataModelController):
             'team_mates': ('team_mates', Collection.Dict(list), None),
             'elo': ('elo', float, None),
             'rank': ('rank', int, None),
-            'ranked_wins': ('ranked_wins', int, None)
+            'ranked_wins': ('ranked_wins', int, None),
+            'ranked_losses': ('ranked_wins', int, None)
         })
         return rules
 
@@ -48,9 +49,10 @@ class UserStatistics(DataModelController):
             'lost_counter_rounds': 0,
             'avg_win_bet': 0,
             'avg_counter_win': 0,
-            'elo': 800.0,
+            'elo': 600.0,
             'rank': 1,
-            'ranked_win': 0,
+            'ranked_wins': 0,
+            'ranked_losses': 0,
             'team_mates': {}
         })
         return defaults
@@ -109,8 +111,9 @@ class UserStatistics(DataModelController):
             self.games_won += 1
             self.ranked_wins += 1
         else:
+            self.ranked_losses += 1
             self.games_lost += 1
-        games_played = self.games_won + self.games_lost
+        games_played = self.ranked_wins + self.ranked_losses
         elo_change = _elo_calc(team_elo, games_played, opposing_team_elo, win,
                                self.ranked_wins)
         self.elo = min(200, self.elo + elo_change)
@@ -121,10 +124,8 @@ class UserStatistics(DataModelController):
         self.add_game_to_history(game_id)
         if win:
             self.games_won += 1
-            self.elo += 1.0
         else:
             self.games_lost += 1
-            self.elo = min(200, self.elo - 1)
         self.rank = _elo_rank(self.elo, self.ranked_wins)
         if team_mate not in self.team_mates:
             self.team_mates[team_mate] = (0, 0)

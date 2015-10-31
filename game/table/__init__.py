@@ -43,7 +43,7 @@ class Table(DataModelController):
 
     """
 
-    State = Enum('BETTING', 'PLAYING', 'PAUSED')
+    State = Enum('BETTING', 'PLAYING', 'PAUSED', 'END')
 
     # noinspection PyCallByClass,PyTypeChecker,PyMethodParameters
     @classproperty
