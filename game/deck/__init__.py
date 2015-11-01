@@ -52,10 +52,7 @@ class Deck(CardHolder):
         cards = []
         for suit in Card.Suit:
             cards += [Card(suit, val) for val in defaults[suit]]
-        kwargs.update({
-            'cards': cards
-        })
-        ctrl = super(Deck, cls).new(data_store, **kwargs)
+        ctrl = super(Deck, cls).new(cards, data_store, **kwargs)
         return ctrl
 
     def rebuild(self, *args):
@@ -89,7 +86,7 @@ class Deck(CardHolder):
         """
         if count is 1:
             return self._pop_card()
-        return [self._pop_card() for _ in xrange(count - 1)]
+        return [self._pop_card() for _ in xrange(count)]
 
 # ----------------------------------------------------------------------------
 __version__ = 0.1

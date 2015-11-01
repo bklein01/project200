@@ -121,7 +121,7 @@ class Player(Spectator):
     def new(cls, user, team, data_store, **kwargs):
         kwargs.update({
             'team': team,
-            'hand': CardHolder.new(None, 'suit', data_store)
+            'hand': CardHolder.new(None, data_store, sort_method='suit')
         })
         return super(Player, cls).new(user, data_store, **kwargs)
 
@@ -135,6 +135,7 @@ class Player(Spectator):
         if not self.abandoned:
             raise ValueError('Cannot change user of unabandoned player.')
         self.user = user
+        self.name = user.profile_name
         self.abandoned = False
 
 # ----------------------------------------------------------------------------

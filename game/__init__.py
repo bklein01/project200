@@ -74,13 +74,13 @@ class Game(DataModelController):
         rules = super(Game, cls).MODEL_RULES
         rules.update({
             'players': ('players', Collection.List(DataModel),
-                        lambda x: x.model),
+                        lambda x: x.model if x else DataModel.Null),
             'state': ('state', str, None),
-            'table': ('table', DataModel, lambda x: x.model),
+            'table': ('table', DataModel, lambda x: x.model if x else DataModel.Null),
             'points': ('points', Collection.Dict(int), None),
             'spectators': ('spectators', Collection.List(DataModel),
-                           lambda x: x.model),
-            'options': ('options', Collection.Dict, lambda x: dict(x))
+                           lambda x: x.model if x else DataModel.Null),
+            'options': ('options', Collection.Dict, None)
         })
         return rules
 
@@ -101,9 +101,11 @@ class Game(DataModelController):
     # noinspection PyMethodOverriding
     @classmethod
     def new(cls, creating_user, data_store, options=None, **kwargs):
+        if not options:
+            options = {}
         ctrl = super(Game, cls).new(data_store, **kwargs)
         ctrl.options.update(options)
-        ctrl.add_player(creating_user, 'A')
+        ctrl.add_player(creating_user, 0)
         return ctrl
 
     # noinspection PyMethodOverriding
@@ -137,7 +139,7 @@ class Game(DataModelController):
 
         :raise: StateError if `Game` is not `Ready`.
         """
-        if self.state in (Game.State.READY, Game.State.END):
+        if self.state not in (Game.State.READY, Game.State.END):
             raise StateError("Cannot start game while in state: " + self.state)
         if self.options.sixes:
             deck = THDeckSixes.new(self._data_store)
@@ -210,7 +212,7 @@ class Game(DataModelController):
 
         :param p: Player -- The `Player` to remove.
         """
-        if self.state is Game.State.RUNNING:
+        if self.state in (Game.State.RUNNING, Game.State.PAUSED):
             p.abandoned = True
             self._update_model('players')
             self.table.pause()
@@ -226,7 +228,7 @@ class Game(DataModelController):
     def remove_player_by_user_id(self, user_id):
         """Remove player from game by `User.user_id`.
 
-        :param user_id: int -- The ID of the user to remove.
+        :param user_id: str -- The ID of the user to remove.
         :raise: ValueError if user is not a player.
         """
         for p in self.players:
@@ -249,14 +251,14 @@ class Game(DataModelController):
         team = 'A' if slot in (0, 2) else 'B'
         if self.state is Game.State.CREATED:
             self.players[slot] = Player.new(user, team, self._data_store)
-            self.update_model('players')
+            self._update_model('players')
             if self.active_players() == 4:
                 self.state = Game.State.READY
         elif self.state is Game.State.PAUSED and self.players[slot].abandoned:
             self.players[slot].new_user(user)
-            self.update_model('players')
+            self._update_model('players')
             if self.active_players() == 4:
-                self.state = Game.State.Running
+                self.state = Game.State.RUNNING
                 self.table.resume()
         else:
             raise StateError("Cannot add new player in state: " + self.state)

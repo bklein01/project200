@@ -51,14 +51,15 @@ class Table(DataModelController):
     def MODEL_RULES(cls):
         rules = super(Table, cls).MODEL_RULES
         rules.update({
-            'deck': ('deck', DataModel, lambda x: x.model),
+            'deck': ('deck', DataModel,
+                     lambda x: x.model if x else DataModel.Null),
             'players': ('players', list, None),
             'kitty': ('kitty', Collection.List,
                       lambda x: dict(x) if x else None),
-            'active': ('active', Collection.List,
+            'active_cards': ('active_cards', Collection.List,
                        lambda x: dict(x) if x else None),
             'discards': ('discards', Collection.Dict(DataModel),
-                         lambda x: x.model),
+                         lambda x: x.model if x else DataModel.Null),
             'state': ('state', str, None),
             'betters': ('betters', Collection.List(int), None),
             'player_turn': ('player_turn', int, None),
@@ -150,11 +151,12 @@ class Table(DataModelController):
         if self.state is not Table.State.CREATED:
             raise StateError('Table must be CREATED to be setup.')
         self.deck.shuffle()
+        self.kitty = self.deck.deal(4)
         while self.deck.has_cards:
             for pid in self.players:
                 card = self.deck.deal()
-                Player.get(pid, self._data_store).hand.add_card(card)
-        self.update_model('deck')
+                Player.get(pid, self._data_store).hand.insert_card(card)
+        self._update_model('deck')
         self.state = Table.State.BETTING
         self.player_turn = self.round_start_player
 
@@ -173,10 +175,12 @@ class Table(DataModelController):
         self.state = self._prev_state
         self._prev_state = None
 
-    def next_turn(self):
-        next_turn = (self.player_turn + 1) % len(self.players)
+    def next_turn(self, add=1):
+        next_turn = (self.player_turn + add) % len(self.players)
         if self.state is Table.State.BETTING and len(self.betters) is 1:
             self._end_betting()
+        elif self.state is Table.State.BETTING and next_turn not in self.betters:
+            self.next_turn(add + 1)
         elif (self.state is Table.State.PLAYING and
                 next_turn is self.round_start_player):
             self._end_round()
@@ -192,11 +196,12 @@ class Table(DataModelController):
             del self.betters[i]
             self._update_model_collection('betters', {'action': 'remove',
                                                       'index': i})
-        if (amount % 5) is not 0:
+        elif (amount % 5) is not 0:
             raise ValueError("Amount must be a multiple of 5.")
-        if amount < self.bet_amount:
+        elif amount <= self.bet_amount:
             raise ValueError("Amount cannot be less than current bid.")
-        self.bet_amount = amount
+        else:
+            self.bet_amount = amount
         self.next_turn()
 
     def play_card(self, player_id, card):
@@ -210,7 +215,7 @@ class Table(DataModelController):
             c = p.hand.remove_card(card)
         if not p or not c:
             raise ValueError("Invalid player or card supplied to play_card.")
-        self.active_cards[self.player_turn] = card
+        self.active_cards[self.player_turn] = c
         self._update_model('active_cards')
         self.next_turn()
 
@@ -224,9 +229,10 @@ class Table(DataModelController):
 
     def _end_betting(self):
         self.round_start_player = self.betters[0]
-        p = Player.get(self.betters[0], self._data_store)
+        p = Player.get(self.players[self.betters[0]], self._data_store)
         self.bet_team = p.team
-        p.hand.append_cards(self.kitty)
+        for c in self.kitty:
+            p.hand.insert_card(c)
         self.kitty = [None] * 4
         self.state = Table.State.PLAYING
         self.player_turn = self.round_start_player
@@ -252,8 +258,6 @@ class Table(DataModelController):
         else:
             self.round_start_player = index
             self.player_turn = index
-
-
 
 
 # ----------------------------------------------------------------------------

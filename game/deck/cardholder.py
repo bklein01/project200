@@ -112,6 +112,10 @@ class CardHolder(DataModelController):
     def card_count(self):
         return len(self.cards)
 
+    @property
+    def has_cards(self):
+        return bool(self.card_count)
+
     def add_card(self, suit, value):
         """Create and add new card to holder.
 
@@ -176,16 +180,16 @@ class CardHolder(DataModelController):
         :param card: Card -- The card object to insert
         :return: int -- The index of the new card.
         """
-        if not self.card_count:
+        if not self.has_cards:
             return self.append_card(card)
         if index is None:
-            if not self.sort_compare:
+            if not self.sort_method:
                 raise IndexError("No compare method set for CardHolder. "
                                  "Index required.")
             index = 0
-            comp = self.__class__.SORT_COMP_METHODS[self.sort_compare]
+            comp = self.__class__.SORT_COMP_METHODS[self.sort_method]
             comp_val = 1 if self.sort_ascend else -1
-            while comp(card, self.cards[index]) == comp_val:
+            while index < self.card_count and comp(card, self.cards[index]) == comp_val:
                 index += 1
         self.cards.insert(index, card)
         self._update_model_collection('cards', {'action': 'insert',
@@ -194,10 +198,10 @@ class CardHolder(DataModelController):
 
     def sort(self):
         """Sorts cards list."""
-        if not self.compare:
+        if not self.sort_method:
             raise AttributeError("No compare method set for CardHolder; "
                                  "cannot sort.")
-        self.cards.sort(self.__class__.SORT_COMP_METHODS[self.sort_compare])
+        self.cards.sort(self.__class__.SORT_COMP_METHODS[self.sort_method])
         self._update_model('cards')
 
     def shuffle(self):

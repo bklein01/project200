@@ -25,7 +25,7 @@ class UserStatistics(DataModelController):
             'lost_bet_rounds': ('lost_bet_rounds', int, None),
             'won_counter_rounds': ('won_counter_rounds', int, None),
             'lost_counter_rounds': ('lost_counter_rounds', int, None),
-            'avg_win_bet': ('avg_bet_win', int, None),
+            'avg_win_bet': ('avg_win_bet', int, None),
             'avg_counter_win': ('avg_counter_win', int, None),
             'team_mates': ('team_mates', Collection.Dict(list), None),
             'elo': ('elo', float, None),
