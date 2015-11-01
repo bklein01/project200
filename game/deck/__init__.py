@@ -56,8 +56,17 @@ class Deck(CardHolder):
             'cards': cards
         })
         ctrl = super(Deck, cls).new(data_store, **kwargs)
-        ctrl.shuffle()
         return ctrl
+
+    def rebuild(self, *args):
+        """Rebuild deck from discard CardHolders and/or lists."""
+        cards = []
+        for arg in args:
+            if isinstance(arg, list):
+                cards += arg
+            elif isinstance(arg, CardHolder):
+                cards += arg.dump_cards()
+        self.cards = cards
 
     def _pop_card(self):
         """Pop card of top of deck.

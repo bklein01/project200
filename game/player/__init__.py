@@ -125,6 +125,12 @@ class Player(Spectator):
         })
         return super(Player, cls).new(user, data_store, **kwargs)
 
+    def __init__(self, *args, **kwargs):
+        super(Player, self).__init__(*args, **kwargs)
+        self.hand.on_change('*', (
+            lambda model, key, instruction:
+                self._call_listener('hand', instruction, {'property': key})))
+
     def new_user(self, user):
         if not self.abandoned:
             raise ValueError('Cannot change user of unabandoned player.')

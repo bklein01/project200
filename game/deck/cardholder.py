@@ -81,8 +81,8 @@ class CardHolder(DataModelController):
     def INIT_DEFAULTS(cls):
         defaults = super(CardHolder, cls).INIT_DEFAULTS
         defaults.update({
-            'ascend': False,
-            'sort': None
+            'sort_ascend': False,
+            'sort_method': 'suit'
         })
         return defaults
 
@@ -92,12 +92,21 @@ class CardHolder(DataModelController):
         if not ctrl:
             kwargs.update({
                 'cards': [Card(c) for c in data_model.cards],
-                'sort': data_model.sort_method,
+                'sort_method': data_model.sort_method,
                 'sort_ascend': data_model.sort_ascend
             })
             ctrl = super(CardHolder, cls).restore(data_model, data_store,
                                                   **kwargs)
         return ctrl
+
+    @classmethod
+    def new(cls, cards, data_store, **kwargs):
+        if not cards:
+            cards = []
+        kwargs.update({
+            'cards': cards
+        })
+        return super(CardHolder, cls).new(data_store, **kwargs)
 
     @property
     def card_count(self):
@@ -135,11 +144,15 @@ class CardHolder(DataModelController):
             self.sort()
 
     def remove_card(self, card):
-        if type(card) is int:
-            card = self.cards[card]
-        if not card:
-            raise ValueError("Card not found in holder.")
+        try:
+            if type(card) is int:
+                card = self.cards[card]
+            else:
+                index = self.cards.index(card)
+        except (IndexError, ValueError):
+            return None
         self.cards.remove(card)
+        return card
 
     def append_card(self, card):
         """Add card to end of cards holder. Does not sort.

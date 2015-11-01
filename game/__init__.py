@@ -73,7 +73,8 @@ class Game(DataModelController):
     def MODEL_RULES(cls):
         rules = super(Game, cls).MODEL_RULES
         rules.update({
-            'players': ('players', Collection.List(DataModel), lambda x: x.model),
+            'players': ('players', Collection.List(DataModel),
+                        lambda x: x.model),
             'state': ('state', str, None),
             'table': ('table', DataModel, lambda x: x.model),
             'points': ('points', Collection.Dict(int), None),
@@ -88,7 +89,7 @@ class Game(DataModelController):
     def INIT_DEFAULTS(cls):
         defaults = super(Game, cls).INIT_DEFAULTS
         defaults.update({
-            'players': [],
+            'players': [None] * 4,
             'spectators': [],
             'state': Game.State.CREATED,
             'points': {'A': 0, 'B': 0},
@@ -128,8 +129,8 @@ class Game(DataModelController):
     def active_players(self, team=None):
         if team:
             len([1 for p in self.players
-                 if p.team == team and not p.abandoned])
-        return len([1 for p in self.players if not p.abandoned])
+                 if p and p.team == team and not p.abandoned])
+        return len([1 for p in self.players if p and not p.abandoned])
 
     def new_game(self):
         """Start a new game.
@@ -143,7 +144,8 @@ class Game(DataModelController):
         else:
             deck = THDeckOriginal.new(self._data_store)
         self.points = {'A': 0, 'B': 0}
-        self.table = Table(self.players, deck)
+        self.table = Table.new([p.uid for p in self.players],
+                               deck, self._data_store)
         self.table.on_change('*', (
             lambda model, key, instruction:
                 self._call_listener('table', instruction, {'property': key})))
@@ -151,6 +153,7 @@ class Game(DataModelController):
             lambda model, key, instruction:
                 self._table_round_end(model)
                 if model.state is Table.State.END else 0))
+        self.table.setup()
         self.state = Game.State.RUNNING
 
     def _table_round_end(self, model):
@@ -209,11 +212,12 @@ class Game(DataModelController):
         """
         if self.state is Game.State.RUNNING:
             p.abandoned = True
+            self._update_model('players')
             self.table.pause()
             self.state = Game.State.PAUSED
         elif self.state in (Game.State.READY, Game.State.END):
             index = self.players.index(p)
-            self.players.remove(p)
+            self.players[index] = None
             Player.delete(p.uid, self._data_store)
             self._update_model_collection('players', {'action': 'remove',
                                                       'index': index})
@@ -230,7 +234,7 @@ class Game(DataModelController):
                 return self.remove_player(p)
         raise ValueError("User is not a player in this game.")
 
-    def add_player(self, user, team):
+    def add_player(self, user, slot):
         """Add a player to the game.
 
         :param user: User -- The player's `User` object.
@@ -238,22 +242,22 @@ class Game(DataModelController):
         :raise: ValueError if `Game` is not in a state to add players, or the
             table is already full.
         """
-        if self.active_players() == 4:
-            raise ValueError("Game is full. Cannot add player.")
-        if self.active_players(team) == 2:
-            raise ValueError("Team `" + team + "` is full. Cannot add player.")
+        if slot not in range(4):
+            raise ValueError("Invalid player slot provided.")
+        if self.players[slot] and not self.players[slot].abandoned:
+            raise ValueError("Slot is taken. Cannot add player.")
+        team = 'A' if slot in (0, 2) else 'B'
         if self.state is Game.State.CREATED:
-            self.players.append(Player(user, team))
+            self.players[slot] = Player.new(user, team, self._data_store)
+            self.update_model('players')
             if self.active_players() == 4:
                 self.state = Game.State.READY
-        elif self.state is Game.State.PAUSED:
-            for p in self.players:
-                if p.abbandoned and p.team is team:
-                    p.new_user(user)
-                    if self.active_players() == 4:
-                        self.state = Game.State.Running
-                        self.table.resume()
-                    break
+        elif self.state is Game.State.PAUSED and self.players[slot].abandoned:
+            self.players[slot].new_user(user)
+            self.update_model('players')
+            if self.active_players() == 4:
+                self.state = Game.State.Running
+                self.table.resume()
         else:
             raise StateError("Cannot add new player in state: " + self.state)
 
