@@ -13,6 +13,7 @@ from core.enum import Enum
 from core.exceptions import StateError
 from core.decorators import classproperty
 from game.deck import CardHolder, Deck, Card
+from game.player import Player
 
 
 # noinspection PyAttributeOutsideInit
@@ -59,9 +60,12 @@ class Table(DataModelController):
             'discards': ('discards', Collection.Dict(DataModel),
                          lambda x: x.model),
             'state': ('state', str, None),
+            'bets': ('bets', Collection.List, None),
             'player_turn': ('turn', int, None),
             'bet_amount': ('bet_amount', int, None),
             'bet_team': ('bet_team', str, lambda x: 'None' if x is None else x),
+            'trump_suit': ('trump_suit', int, None),
+            'round_start_player': ('round_start_player', int, None),
             '_prev_state': ('_prev_state', None, None)
         })
         return rules
@@ -71,14 +75,14 @@ class Table(DataModelController):
     def INIT_DEFAULTS(cls):
         defaults = super(Table, cls).INIT_DEFAULTS
         defaults.update({
-            'discards': {'A': CardHolder(None, 'value'),
-                         'B': CardHolder(None, 'value')},
             'kitty': [None] * 4,
             'active_cards': [None] * 4,
             'state': Table.State.BETTING,
             'turn': 1,
+            'round_start_player': 1,
             'bet_team': '',
             'bet_amount': 0,
+            'trump_suit': 0,
             '_prev_state': None
         })
         return defaults
@@ -87,7 +91,12 @@ class Table(DataModelController):
     @classmethod
     def new(cls, players, deck, data_store):
         kwargs = {'players': players,
-                  'deck': deck}
+                  'deck': deck,
+                  'discards': {
+                      'A': CardHolder.new(None, 'value', data_store),
+                      'B': CardHolder.new(None, 'value', data_store)
+                  }
+        }
         ctrl = super(Table, cls).new(data_store, **kwargs)
         return ctrl
 
@@ -109,10 +118,16 @@ class Table(DataModelController):
             'bet_team': data_model.bet_team,
             'bet_amount': data_model.bet_amount,
             '_prev_state': data_model['_prev_state'],
+            'trump_suit': data_model.trump_suit,
+            'round_start_player': data_model.round_start_player,
             'deck': Deck.restore(data_model.deck, data_store),
             'players': data_model.players
         }
         super(Table, cls).restore(data_model, data_store, **kwargs)
+
+    @property
+    def starting_suit(self):
+        return self.active_cards[self.round_start_player].suit
 
     def pause(self):
         """Pause the game."""
@@ -128,6 +143,40 @@ class Table(DataModelController):
             raise StateError("Cannot resume to unknown state.")
         self.state = self._prev_state
         self._prev_state = None
+
+    def next_turn(self):
+        self.player_turn = (self.player_turn + 1) % len(self.players)
+        if self.player_turn is self.round_start_player:
+            if self.state is Table.State.BETTING:
+                pass
+            elif self.state is Table.State.PLAYING:
+                self._end_round()
+
+    def play_card(self, player_id, card):
+        pass
+
+    def _end_round(self):
+        suits = [self.starting_suit, self.trump_suit]
+        high_card = self.active_cards[self.round_start_player]
+        for c in self.active_cards:
+            if c is high_card:
+                continue
+            if (c.suit in suits and
+                (suits.index(c.suit) > suits.index(high_card.suit) or
+                 (c.suit is high_card.suit and c.value > high_card.value))):
+                high_card = c
+        index = self.active_cards.index(high_card)
+        winner = Player.get(self.players[index], self._data_store)
+        for c in self.active_cards:
+            self.discards[winner.team].append(c)
+            self._update_model_collection('discards', {'action': 'append'})
+        self.active_cards = [None] * 4
+        if not winner.card_count:
+            self.state = Table.State.END
+        else:
+            self.round_start_player = index
+
+
 
 
 # ----------------------------------------------------------------------------

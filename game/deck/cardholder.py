@@ -136,7 +136,7 @@ class CardHolder(DataModelController):
 
     def remove_card(self, card):
         if type(card) is int:
-            card = self.cards.index(card)
+            card = self.cards[card]
         if not card:
             raise ValueError("Card not found in holder.")
         self.cards.remove(card)
@@ -149,6 +149,10 @@ class CardHolder(DataModelController):
         self.cards.append(card)
         self._update_model_collection('cards', {'action': 'append'})
         return self.card_count - 1
+
+    def append_cards(self, cards):
+        for c in cards:
+            self.append_card(c)
 
     def insert_card(self, card, index=None):
         """Insert card in specified index, or sorted order.
