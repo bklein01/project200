@@ -130,6 +130,11 @@ class Table(DataModelController):
         })
         super(Table, cls).restore(data_model, data_store, **kwargs)
 
+    def __del__(self):
+        for k, v in self.discards.iteritems():
+            CardHolder.delete(v.uid, self._data_store)
+        Deck.delete(self.deck.uid, self._data_store)
+
     def restart(self):
         if self.state is not Table.State.END:
             raise StateError("Cannot restart a game from state: " + self.state)

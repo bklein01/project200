@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """Project unit testing library.
 
 .. packageauthor: zimmed <zimmed@zimmed.io>
@@ -16,7 +17,7 @@ import json
 class TestCase(unittest.TestCase):
     """Base test case."""
 
-    def assertHasAttribute(self, obj, attr_name):
+    def assertHasAttribute(self, obj, attr_name, msg=None):
         """Assert object has attribute.
 
         :param obj: mixed -- The object to test.
@@ -24,10 +25,11 @@ class TestCase(unittest.TestCase):
 
         :raise AssertionError if object does not contain the attribute specified.
         """
-        if not hasattr(obj, attr_name):
-            raise AssertionError("Object has no attribute: `" + attr_name + "`.")
+        if not msg:
+            msg = "Object has no attribute: `" + attr_name + "`."
+        self.assertTrue(hasattr(obj, attr_name), msg)
 
-    def assertHasAttributes(self, obj, attr_names):
+    def assertHasAttributes(self, obj, attr_names, msg=None):
         """Assert object has multiple attributes.
 
         :param obj: mixed -- The object to test.
@@ -37,25 +39,27 @@ class TestCase(unittest.TestCase):
             attributes.
         """
         for attr_name in attr_names:
-            self.assertHasAttribute(obj, attr_name)
+            self.assertHasAttribute(obj, attr_name, msg)
 
-    def assertIsJsonReady(self, obj):
+    def assertIsJsonReady(self, obj, msg=None):
         """Assert object is JSON ready.
 
         :param obj: mixed -- The object to test.
 
         :raise AssertionError if object does not dump to JSON without error.
         """
+        if not msg:
+            msg = "Object is not JSON-ready."
         try:
             json.dumps(obj)
-        except Exception as e:
-            raise AssertionError("Object not JSON-ready: " + str(e))
+        except (TypeError, ValueError):
+            raise AssertionError(msg)
 
 
 def main():
     unittest.main()
 
-if __name__ == "main":
+if __name__ == "__main__":
     main()
 
 # ----------------------------------------------------------------------------

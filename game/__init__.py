@@ -117,16 +117,27 @@ class Game(DataModelController):
         kwargs = {
             'players':
                 [Player.restore(x, data_store)
-                 for x in data_model.players],
+                 for x in data_model.players if x is not DataModel.Null],
             'spectators':
                 [Spectator.restore(x, data_store)
-                 for x in data_model.spectators],
+                 for x in data_model.spectators if x is not DataModel.Null],
             'state': data_model.state,
-            'table': Table.restore(data_model.table, data_store),
+            'table': (Table.restore(data_model.table, data_store)
+                      if data_model.table is not DataModel.Null else None),
             'points': data_model.points,
             'options': DotDict(data_model.options)
         }
         super(Game, cls).restore(data_model, data_store, **kwargs)
+
+    def __del__(self):
+        for p in self.players:
+            if p:
+                Player.delete(p.uid, self._data_store)
+        if self.table:
+            Table.delete(self.table.uid, self._data_store)
+        for s in self.spectators:
+            if s:
+                Spectator.delete(s.uid, self._data_store)
 
     def active_players(self, team=None):
         if team:
@@ -181,9 +192,9 @@ class Game(DataModelController):
                     p.statistics.won_counter_round(100 - s)
             scores[model.bet_team] = -1 * model.bet_amount
             self._update_points(**scores)
-        if self.points['A'] >= 200:
+        if self.points['A'] >= self.options.win_amount:
             self._end_game('A')
-        elif self.points['B'] >= 200:
+        elif self.points['B'] >= self.options.win_amount:
             self._end_game('B')
         else:
             self.table.restart()
@@ -217,7 +228,8 @@ class Game(DataModelController):
             self._update_model('players')
             self.table.pause()
             self.state = Game.State.PAUSED
-        elif self.state in (Game.State.READY, Game.State.END):
+        elif self.state in (Game.State.READY, Game.State.END,
+                            Game.State.CREATED):
             index = self.players.index(p)
             self.players[index] = None
             Player.delete(p.uid, self._data_store)
@@ -232,7 +244,7 @@ class Game(DataModelController):
         :raise: ValueError if user is not a player.
         """
         for p in self.players:
-            if p.user.uid == user_id:
+            if p and p.user.uid == user_id:
                 return self.remove_player(p)
         raise ValueError("User is not a player in this game.")
 
@@ -248,6 +260,9 @@ class Game(DataModelController):
             raise ValueError("Invalid player slot provided.")
         if self.players[slot] and not self.players[slot].abandoned:
             raise ValueError("Slot is taken. Cannot add player.")
+        for p in self.players:
+            if p and not p.abandoned and p.user.uid is user.uid:
+                raise ValueError("User already apart of game.")
         team = 'A' if slot in (0, 2) else 'B'
         if self.state is Game.State.CREATED:
             self.players[slot] = Player.new(user, team, self._data_store)
@@ -260,8 +275,7 @@ class Game(DataModelController):
             if self.active_players() == 4:
                 self.state = Game.State.RUNNING
                 self.table.resume()
-        else:
-            raise StateError("Cannot add new player in state: " + self.state)
+        # should never get here
 
     def add_spectator(self, user):
         """Add a spectator to the game.

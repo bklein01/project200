@@ -42,6 +42,9 @@ class DocumentCollection(object):
     def get_controller(self, uid):
         return self._controllers[uid]
 
+    def remove_controller(self, uid):
+        del self._controllers[uid]
+
     def find(self, **kwargs):
         items = []
         for k, v in self._documents.iteritems():
@@ -99,8 +102,18 @@ class ModelStore(object):
         doc_type = cls._key(doc_type)
         try:
             cls._DOCUMENT_COLLECTIONS[doc_type].remove(uid)
+            return True
         except KeyError:
-            pass
+            return False
+
+    @classmethod
+    def delete_controller(cls, doc_type, uid):
+        doc_type = cls._key(doc_type)
+        try:
+            cls._DOCUMENT_COLLECTIONS[doc_type].remove_controller(uid)
+            return True
+        except KeyError:
+            return False
 
     @classmethod
     def get(cls, doc_type, uid):
