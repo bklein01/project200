@@ -127,17 +127,7 @@ class Game(DataModelController):
             'points': data_model.points,
             'options': DotDict(data_model.options)
         }
-        super(Game, cls).restore(data_model, data_store, **kwargs)
-
-    def __del__(self):
-        for p in self.players:
-            if p:
-                Player.delete(p.uid, self._data_store)
-        if self.table:
-            Table.delete(self.table.uid, self._data_store)
-        for s in self.spectators:
-            if s:
-                Spectator.delete(s.uid, self._data_store)
+        return super(Game, cls).restore(data_model, data_store, **kwargs)
 
     def active_players(self, team=None):
         if team:
@@ -161,7 +151,8 @@ class Game(DataModelController):
                                deck, self._data_store)
         self.table.on_change('*', (
             lambda model, key, instruction:
-                self._call_listener('table', instruction, {'property': key})))
+                self._call_listener(
+                    'table', instruction, {'property': key})))
         self.table.on_change('state', (
             lambda model, key, instruction:
                 self._table_round_end(model)
@@ -244,7 +235,7 @@ class Game(DataModelController):
         :raise: ValueError if user is not a player.
         """
         for p in self.players:
-            if p and p.user.uid == user_id:
+            if p and p.user.uid == user_id and not p.abandoned:
                 return self.remove_player(p)
         raise ValueError("User is not a player in this game.")
 

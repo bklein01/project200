@@ -9,6 +9,7 @@ from . import (GameNoInitTestCase, GameInitTestCase, GameCreatedTestCase,
                GameReadyTestCase, GameRunningTestCase)
 from core.exceptions import StateError
 from game import Game
+import sys
 
 
 class GameNewTest(GameNoInitTestCase):
@@ -53,19 +54,19 @@ class GameLoadTest(GameInitTestCase):
         uid = self._game.uid
         gid = id(self._game)
         # Delete controller from memory
-        self._game = None
         self.assertTrue(self._ds.delete_controller(Game, uid),
                         "Game controller delete from store failed.")
+        self.assertIsNone(self._ds.get_controller(Game, uid),
+                          "Controller delete failed.")
         # Retrieve new controller from existing model
-        self._game = Game.get(uid, self._ds)
-        self.assertIsInstance(self._game, Game,
+        _game = Game.get(uid, self._ds)
+        self.assertIsInstance(_game, Game,
                               "`get` Didn't retrieve Game controller.")
-        self.assertEqual(self._game.uid, uid,
+        self.assertEqual(_game.uid, uid,
                          "Game controller `get` does not match uid.")
-        self.assertNotEqual(gid, id(self._game),
+        self.assertNotEqual(gid, id(_game),
                             "Game controller didn't delete properly.")
-        gid = id(self._game)
-        self._game = None
+        gid = id(_game)
         self._ds.delete_controller(Game, uid)
         self._game = Game.load(uid, self._ds)
         self.assertIsInstance(self._game, Game,
@@ -91,13 +92,12 @@ class GameLoadTest(GameInitTestCase):
         model = self._game.model
         gid = id(self._game)
         self._ds.delete_controller(Game, model.uid)
-        self._game = None
-        self._game = Game.restore(model, self._ds)
-        self.assertIsInstance(self._game, Game,
+        _game = Game.restore(model, self._ds)
+        self.assertIsInstance(_game, Game,
                               "`restore` didn't retrieve Game controller.")
-        self.assertEqual(self._game.uid, model.uid,
+        self.assertEqual(_game.uid, model.uid,
                          "Controller and model do not match.")
-        self.assertNotEqual(gid, id(self._game),
+        self.assertNotEqual(gid, id(_game),
                             "Game controller didn't delete properly.")
 
 
@@ -112,7 +112,7 @@ class GameSetupTest(GameCreatedTestCase):
 
     def test_invalid_game_setup(self):
         with self.assertRaises(ValueError):
-            self._game.add_player(self._users[0], 1)
+            self._game.add_player(self._creator, 1)
         with self.assertRaises(ValueError):
             self._game.add_player(self._users[1], 0)
         for x in xrange(1, 4):
@@ -175,9 +175,9 @@ class GamePauseResumeTest(GameRunningTestCase):
         self._game.add_player(self._users[2], 1)
         self.assertIsRUNNING(self._game)
         self.assertEqual(self._game.active_players(), 4)
-        self.assertIs(self._game.players[1], p_1_model,
+        self.assertIs(self._game.players[1].model, p_1_model,
                       "Player 1 model did not preserve.")
-        self.assertIs(self._game.players[2], p_2_model,
+        self.assertIs(self._game.players[2].model, p_2_model,
                       "Player 2 model did not preserve.")
 
     def test_invalid_pause_resume(self):
@@ -195,8 +195,4 @@ class GamePauseResumeTest(GameRunningTestCase):
         self.assertIsPAUSED(self._game)
         with self.assertRaises(StateError):
             self._game.new_game()
-
-
-
-
 

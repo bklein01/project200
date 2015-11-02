@@ -59,7 +59,7 @@ class GameInitTestCase(GameNoInitTestCase):
 
     def tearDown(self):
         super(GameInitTestCase, self).tearDown()
-        if self._game:
+        if hasattr(self, '_game') and self._game:
             Game.delete(self._game.uid, self._ds)
         self._game = None
 
