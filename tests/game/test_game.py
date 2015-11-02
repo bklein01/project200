@@ -9,12 +9,13 @@ from . import (GameNoInitTestCase, GameInitTestCase, GameCreatedTestCase,
                GameReadyTestCase, GameRunningTestCase)
 from core.exceptions import StateError
 from game import Game
-import sys
 
 
 class GameNewTest(GameNoInitTestCase):
+    """Game construction tests."""
 
     def test_new(self):
+        """Tests Game.new with default args."""
         obj = Game.new(self._creator, self._ds)
         self.assertIsInstance(obj, Game, "Game instance not initialized.")
         self.assertHasAttribute(obj, 'uid', "Game has no unique ID.")
@@ -23,6 +24,7 @@ class GameNewTest(GameNoInitTestCase):
         self.assertIsCREATED(obj)
 
     def test_new_options(self):
+        """Tests Game.new with options arg."""
         obj = Game.new(self._creator, self._ds, {
             'sixes': True,
             'spec_allow_chat': False,
@@ -37,8 +39,10 @@ class GameNewTest(GameNoInitTestCase):
 
 
 class GameLoadTest(GameInitTestCase):
+    """Game loading/restoring tests."""
 
     def test_load_existing(self):
+        """Tests Game.get/load with existing controller in cache."""
         game_a = Game.get(self._game.uid, self._ds)
         self.assertIsInstance(game_a, Game,
                               "Didn't retrieve Game controller.")
@@ -51,6 +55,7 @@ class GameLoadTest(GameInitTestCase):
                          "Game get and load instances do not match.")
 
     def test_load_stored(self):
+        """Tests Game.get/load with non-existing controller."""
         uid = self._game.uid
         gid = id(self._game)
         # Delete controller from memory
@@ -77,6 +82,7 @@ class GameLoadTest(GameInitTestCase):
                             "Game controller didn't delete properly.")
 
     def test_restore_existing(self):
+        """Tests Game.restore with existing controller."""
         model = self._game.model
         gid = id(self._game)
         self._game = None
@@ -89,6 +95,7 @@ class GameLoadTest(GameInitTestCase):
                          "Game instances do not match.")
 
     def test_restore_stored(self):
+        """Tests Game.restore with non-existing controller."""
         model = self._game.model
         gid = id(self._game)
         self._ds.delete_controller(Game, model.uid)
@@ -102,8 +109,10 @@ class GameLoadTest(GameInitTestCase):
 
 
 class GameSetupTest(GameCreatedTestCase):
+    """Game CREATED to READY tests."""
 
     def test_valid_game_setup(self):
+        """Tests valid behavior for adding players to READY state."""
         self.assertEqual(self._game.active_players(), 1)
         for x in xrange(1, 4):
             self._game.add_player(self._users[x], x)
@@ -111,6 +120,7 @@ class GameSetupTest(GameCreatedTestCase):
         self.assertIsREADY(self._game)
 
     def test_invalid_game_setup(self):
+        """Tests invalid behavior for adding players to READY state."""
         with self.assertRaises(ValueError):
             self._game.add_player(self._creator, 1)
         with self.assertRaises(ValueError):
@@ -122,8 +132,10 @@ class GameSetupTest(GameCreatedTestCase):
 
 
 class GameStartTest(GameReadyTestCase):
+    """Game table setup tests."""
 
     def test_valid_new_game(self):
+        """Tests valid Game.new_game behavior."""
         self._game.new_game()
         self.assertIsRUNNING(self._game)
         self.assertIsNotNone(self._game.table)
@@ -131,6 +143,7 @@ class GameStartTest(GameReadyTestCase):
                          "Game.table unsuccessful init.")
 
     def test_invalid_new_game(self):
+        """Tests invalid Game.new_game behavior."""
         self._game.remove_player_by_user_id(self._users[1].uid)
         with self.assertRaises(StateError):
             self._game.new_game()
@@ -141,8 +154,10 @@ class GameStartTest(GameReadyTestCase):
 
 
 class GamePauseResumeTestPregame(GameReadyTestCase):
+    """Game READY to CREATED behavior."""
 
     def test_valid_pause_resume_pregame(self):
+        """Tests valid behavior for removing players when READY."""
         self._game.remove_player_by_user_id(self._users[1].uid)
         self.assertIsCREATED(self._game)
         self.assertEqual(self._game.active_players(), 3)
@@ -153,6 +168,7 @@ class GamePauseResumeTestPregame(GameReadyTestCase):
         self.assertEqual(self._game.active_players(), 4)
 
     def test_invalid_pause_resume_pregame(self):
+        """Tests invalid behavior for removing players when READY."""
         with self.assertRaises(ValueError):
             self._game.remove_player_by_user_id(self._users[4].uid)
         self._game.remove_player_by_user_id(self._users[2].uid)
@@ -163,8 +179,10 @@ class GamePauseResumeTestPregame(GameReadyTestCase):
 
 
 class GamePauseResumeTest(GameRunningTestCase):
+    """Game RUNNING to PAUSED tests."""
 
     def test_valid_pause_resume(self):
+        """Tests valid behavior for removing players when RUNNING."""
         p_1_model = self._game.players[1].model
         p_2_model = self._game.players[2].model
         self._game.remove_player_by_user_id(self._users[1].uid)
@@ -181,6 +199,7 @@ class GamePauseResumeTest(GameRunningTestCase):
                       "Player 2 model did not preserve.")
 
     def test_invalid_pause_resume(self):
+        """Tests invalid behavior for removing players when RUNNING."""
         with self.assertRaises(ValueError):
             self._game.remove_player_by_user_id(self._users[4].uid)
         self._game.remove_player_by_user_id(self._users[2].uid)
@@ -195,4 +214,3 @@ class GamePauseResumeTest(GameRunningTestCase):
         self.assertIsPAUSED(self._game)
         with self.assertRaises(StateError):
             self._game.new_game()
-
