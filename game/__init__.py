@@ -320,6 +320,7 @@ def _points_calc(cards):
 
 
 def _avg_elo(*args):
+    """Calculates the average (weighted) elo for one or more players."""
     elo = 0.0
     games = 0
     for p in args:

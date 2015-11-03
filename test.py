@@ -2,6 +2,8 @@ from store.user import User
 from store import ModelStore as DataStore
 from game import Game
 from core.dotdict import DotDict
+from server import EventServer
+import sys
 
 
 def prnt(obj, k):
@@ -10,7 +12,22 @@ def prnt(obj, k):
         return f
 
 
-def main():
+def server_main():
+    print "Starting server..."
+    EventServer.start()
+    try:
+        while True:
+            if EventServer.has_events:
+                event = EventServer.get_event()
+                print str(event)
+                if event.type is 'exit':
+                    break
+    except Exception as e:
+        print e
+    EventServer.stop()
+    sys.exit(0)
+
+def game_main():
     users = DotDict({
         'dave': User.new(None, 'dave', 'zimmed@zimmed.io', 'pwhashing', DataStore),
         'sally': User.new(None, 'sally', 'bitchtits@co.co', 'shit', DataStore),
