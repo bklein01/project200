@@ -9,62 +9,71 @@ Exports:
 
 """
 
-import uuid
+from .db import db
+from core.datamodel import DataModelController, DataModel
 
 
-class DocumentCollection(object):
+class ControllerCollection(object):
 
-    @classmethod
-    def generate_id(cls):
-        return uuid.uuid4().hex
+    MAX_CACHE = 100
 
-    def __init__(self):
-        self._documents = {}
-        self._controllers = {}
+    def __init__(self, store, max_cache=None):
+        if not max_cache:
+            max_cache = self.__class__.MAX_CACHE
+        self._max_cache = max_cache
+        self._controllers = []
+        self._ctrl_map = {}
+        self._store = store
 
-    def remove(self, uid):
-        del self._documents[uid]
-        del self._controllers[uid]
+    def prune(self):
+        while len(self._controllers) > self._max_cache:
+            c = self._controllers.pop()
+            del self._ctrl_map[c.uid]
+            self._store.save(c.__class__, c.model)
 
-    def new(self, document):
-        uid = self.__class__.generate_id()
-        while uid in self._documents.iterkeys():
-            uid = self.generate_id()
-        self._documents[uid] = document
-        return uid
+    def shift_down(self, index):
+        for k in self._ctrl_map.iterkeys():
+            if self._ctrl_map[k] > index:
+                self._ctrl_map[k] -= 1
+
+    def shift_up(self):
+        for k in self._ctrl_map.iterkeys():
+            self._ctrl_map[k] += 1
+
+    def insert(self, ctrl):
+        if ctrl.uid in self._ctrl_map.iterkeys():
+            return
+        self._controllers.insert(0, ctrl)
+        self.shift_up()
+        self._ctrl_map[ctrl.uid] = 0
+        self.prune()
 
     def get(self, uid):
-        return self._documents[uid]
+        index = self._ctrl_map[uid]
+        return self._controllers[index]
 
-    def new_controller(self, uid, ctrl):
-        self._controllers[uid] = ctrl
-
-    def get_controller(self, uid):
-        return self._controllers[uid]
-
-    def remove_controller(self, uid):
-        del self._controllers[uid]
-
-    def find(self, **kwargs):
-        items = []
-        for k, v in self._documents.iteritems():
-            if 'uid' in kwargs.iterkeys() and k not in kwargs['uid']:
-                continue
-            del kwargs['uid']
-            for attr, val in kwargs.iteritems():
-                if isinstance(val, list) and v[attr] not in val:
-                    continue
-                elif isinstance(val, tuple) and val not in v[attr]:
-                    continue
-                elif v[attr] != val:
-                    continue
-            items.append(v)
-        return items if items else None
+    def remove(self, uid):
+        index = self._ctrl_map[uid]
+        del self._controllers[index]
+        del self._ctrl_map[uid]
+        self.shift_down(index)
 
 
-class ModelStore(object):
+class DataStore(object):
 
-    _DOCUMENT_COLLECTIONS = {}
+    _CACHE = {}
+    _db = None
+
+    @classmethod
+    def __new__(cls, *args, **kwargs):
+        return cls
+
+    def __init__(self, db_host='localhsot',
+                 db_port='27017',
+                 db_name='zimmed-test1',
+                 model_transform=(lambda rules, data: DataModel(rules, data))):
+        if not self.__class__._db:
+            self.__class__._db = db(db_host, db_port, db_name, model_transform)
 
     @classmethod
     def _key(cls, doc_type):
@@ -76,63 +85,86 @@ class ModelStore(object):
             raise ValueError('Invalid doc_type supplied to ModelStore.')
 
     @classmethod
+    def uid(cls, doc_type):
+        doc_type = cls._key(doc_type)
+        return cls
+
+    @classmethod
     def get_controller(cls, doc_type, uid):
+        if not issubclass(doc_type, type):
+            raise TypeError("`doc_type` must be a type.")
+        key = cls._key(doc_type)
+        ctrl = cls.get_strict_controller(key, uid)
+        if not ctrl:
+            model = cls.get_strict_model(key, uid)
+            if not model:
+                raise ValueError("Object does not exist.")
+            ctrl = doc_type.restore(model, cls)
+        return ctrl
+
+    @classmethod
+    def get_model(cls, doc_type, uid):
+        doc_type = cls._key(doc_type)
+        ctrl = cls.get_strict_controller(doc_type, uid)
+        if ctrl:
+            return ctrl.model
+        return cls.get_strict_model(doc_type, uid)
+
+    @classmethod
+    def get_model_data(cls, doc_type, uid):
+        doc_type = cls._key(doc_type)
+        ctrl = cls.get_strict_controller(doc_type, uid)
+        if ctrl:
+            return dict(ctrl.model)
+        return cls._db.get_model_data(doc_type, uid)
+
+    @classmethod
+    def get_strict_controller(cls, doc_type, uid):
         doc_type = cls._key(doc_type)
         try:
-            return cls._DOCUMENT_COLLECTIONS[doc_type].get_controller(uid)
+            return cls._CACHE[doc_type].get(uid)
         except KeyError:
             return None
 
     @classmethod
-    def set_controller(cls, doc_type, uid, ctrl):
+    def set_controller(cls, doc_type, ctrl):
         doc_type = cls._key(doc_type)
-        if doc_type not in cls._DOCUMENT_COLLECTIONS:
-            cls._DOCUMENT_COLLECTIONS[doc_type] = DocumentCollection()
-        return cls._DOCUMENT_COLLECTIONS[doc_type].new_controller(uid, ctrl)
-
-    @classmethod
-    def insert(cls, doc_type, model):
-        doc_type = cls._key(doc_type)
-        if doc_type not in cls._DOCUMENT_COLLECTIONS:
-            cls._DOCUMENT_COLLECTIONS[doc_type] = DocumentCollection()
-        return cls._DOCUMENT_COLLECTIONS[doc_type].new(model)
-
-    @classmethod
-    def delete(cls, doc_type, uid):
-        doc_type = cls._key(doc_type)
-        try:
-            cls._DOCUMENT_COLLECTIONS[doc_type].remove(uid)
-            return True
-        except KeyError:
-            return False
+        if doc_type not in cls._CACHE:
+            cls._CACHE[doc_type] = ControllerCollection(cls)
+        return cls._CACHE[doc_type].insert(ctrl)
 
     @classmethod
     def delete_controller(cls, doc_type, uid):
         doc_type = cls._key(doc_type)
         try:
-            cls._DOCUMENT_COLLECTIONS[doc_type].remove_controller(uid)
+            cls._CACHE[doc_type].remove(uid)
             return True
         except KeyError:
             return False
 
     @classmethod
-    def get(cls, doc_type, uid):
+    def save(cls, doc_type, model):
         doc_type = cls._key(doc_type)
-        try:
-            return cls._DOCUMENT_COLLECTIONS[doc_type].get(uid)
-        except KeyError:
-            return None
+        cls._db.upsert_model(doc_type, model)
 
     @classmethod
-    def find(cls, **kwargs):
-        if 'doc_type' not in kwargs.iterkeys():
-            raise ValueError('ModelStore.find expected `doc_type` parameter.')
-        doc_type = cls._key(kwargs['doc_type'])
-        del kwargs['doc_type']
-        try:
-            return cls._DOCUMENT_COLLECTIONS[doc_type].find(**kwargs)
-        except KeyError:
-            return None
+    def store_model(cls, doc_type, model):
+        doc_type = cls._key(doc_type)
+        cls._db.insert_model(doc_type, model)
+
+    @classmethod
+    def update_model(cls, doc_type, model):
+        doc_type = cls._key(doc_type)
+        cls._db.update_model(doc_type, model)
+
+    @classmethod
+    def delete_model(cls, doc_type, uid):
+        doc_type = cls._key(doc_type)
+        cls._db.remove_model(doc_type, uid)
+
+    @classmethod
+    def get_strict_model(cls, doc_type, uid):
+        return cls._db.get_model(doc_type, uid)
 
 
 # ----------------------------------------------------------------------------
