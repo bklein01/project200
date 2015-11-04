@@ -8,22 +8,21 @@ Exports:
     :Enum Card.Value -- Enumerated face values.
 """
 
-from core.datamodel import DataModelController
-from core.decorators import classproperty
+from core.dotdict import ImmutableDotDict
+from core.exceptions import InitError
 from core.enum import EnumInt
 
 
-class Card(DataModelController):
+class Card(ImmutableDotDict):
     """Playing card structure.
 
     Class Properties:
         :type Suit: EnumInt -- Enumerated card Suit types.
         :type Value: EnumInt -- Enumerated card values.
-        :type MODEL_RULES: dict -- The set of rules for the `DataModel`.
 
     Init Parameters:
-        suit -- The suit of the card.
-        value -- The face value of the card.
+        card_or_suit -- The card dict or the suit of the card.
+        value -- If suit provided, the face value of the card.
 
     Properties:
         :type suit: Card.Value/int -- The suit of the card.
@@ -35,31 +34,26 @@ class Card(DataModelController):
     Value = EnumInt('JOKER', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN',
                     'EIGHT', 'NINE', 'TEN', 'JACK', 'QUEEN', 'KING', 'ACE')
 
-    # noinspection PyMethodParameters,PyPep8Naming
-    @classproperty
-    def MODEL_RULES(cls):
-        """The rule set for the underlying `DataModel`.
-
-        New Model Keys:
-            :key suit: int -- The Card.Suit value.
-            :key value: int -- The Card.Value value.
-        """
-        return {
-            'suit': ('suit', int, None),
-            'value': ('value', int, None)
-        }
-
-    def __init__(self, suit, value):
+    def __init__(self, card_or_suit, value=None):
         """Card init.
 
-        :param suit: Card.Suit/int -- The card suit.
-        :param value: Card.Value/int -- The card face value.
+        :param card_or_suit: Card.Suit/int | dict -- The card dict or the
+            suit of the card.
+        :param value: Card.Value/int | None -- If suit provided, the face
+            value of the card.
         """
-        self.suit, self.value = suit, value
-        super(Card, self).__init__(self.__class__.MODEL_RULES)
+        if not value:
+            super(Card, self).__init__(card_or_suit)
+        else:
+            super(Card, self).__init__({
+                'suit': card_or_suit,
+                'value': value
+            })
 
     def __setattr__(self, key, value):
         if hasattr(self, key):
             raise ValueError('Card object cannot be changed once assigned.')
         super(Card, self).__setattr__(key, value)
+
+
 

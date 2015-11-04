@@ -1,3 +1,6 @@
 [submodule "core"]
 	path = core
 	url = https://github.com/zimmed/zimmed-core.git
+[submodule "server"]
+	path = server
+	url = https://github.com/zimmed/zimmed-server.git

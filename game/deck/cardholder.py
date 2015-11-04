@@ -44,22 +44,6 @@ class CardHolder(DataModelController):
 
     """
 
-    # noinspection PyPep8Naming,PyMethodParameters,PyCallByClass,PyTypeChecker
-    @classproperty
-    def MODEL_RULES(cls):
-        """The rule set for the underlying `DataModel`.
-
-        New Model Keys:
-            :key cards: Collection.List(DataModel) -- The list of cards.
-            :key sort: str | None -- The sorting compare method name.
-            :key ascend: bool -- Sorting option for ascending order.
-        """
-        return {
-            'cards': ('cards', Collection.List(DataModel), lambda x: x.model),
-            'sort': ('sort_method', None, None),
-            'ascend': ('sort_ascend', bool, None)
-        }
-
     SORT_COMP_METHODS = {
         'suit':
             (lambda a, b: -1 if a.suit < b.suit
@@ -75,22 +59,60 @@ class CardHolder(DataModelController):
                 else 0)
     }
 
-    def __init__(self, cards=None, sort_method=None, ascending_order=False):
-        """CardHolder init.
+    # noinspection PyPep8Naming,PyMethodParameters,PyCallByClass,PyTypeChecker
+    @classproperty
+    def MODEL_RULES(cls):
+        """The rule set for the underlying `DataModel`.
 
-        :param cards: list -- Optional list of cards to init with.
-        :param sort_method: str -- Optional method with which to sort cards.
-        :param ascending_order: bool -- Ascending/descending sort option.
+        New Model Keys:
+            :key cards: Collection.List(DataModel) -- The list of cards.
+            :key sort: str | None -- The sorting compare method name.
+            :key ascend: bool -- Sorting option for ascending order.
         """
-        if cards is None:
+        rules = super(CardHolder, cls).MODEL_RULES
+        rules.update({
+            'cards': ('cards', Collection.List(dict), lambda x: dict(x)),
+            'sort_method': ('sort_method', None, None),
+            'sort_ascend': ('sort_ascend', bool, None)
+        })
+        return rules
+
+    @classproperty
+    def INIT_DEFAULTS(cls):
+        defaults = super(CardHolder, cls).INIT_DEFAULTS
+        defaults.update({
+            'sort_ascend': False,
+            'sort_method': 'suit'
+        })
+        return defaults
+
+    @classmethod
+    def restore(cls, data_store, data_model, **kwargs):
+        kwargs.update({
+            'cards': [Card(c) for c in data_model.cards],
+            'sort_method': data_model.sort_method,
+            'sort_ascend': data_model.sort_ascend
+        })
+        return super(CardHolder, cls).restore(data_store, data_model,
+                                              **kwargs)
+
+    # noinspection PyMethodOverriding
+    @classmethod
+    def new(cls, cards=None, data_store=None, **kwargs):
+        if not cards:
             cards = []
-        self.cards = cards
-        self.sort_method, self.sort_ascend = sort_method, ascending_order
-        super(CardHolder, self).__init__(self.__class__.MODEL_RULES)
+        kwargs.update({
+            'cards': cards
+        })
+        return super(CardHolder, cls).new(data_store, **kwargs)
 
     @property
     def card_count(self):
         return len(self.cards)
+
+    @property
+    def has_cards(self):
+        return bool(self.card_count)
 
     def add_card(self, suit, value):
         """Create and add new card to holder.
@@ -124,11 +146,15 @@ class CardHolder(DataModelController):
             self.sort()
 
     def remove_card(self, card):
-        if type(card) is int:
-            card = self.cards.index(card)
-        if not card:
-            raise ValueError("Card not found in holder.")
+        try:
+            if type(card) is int:
+                card = self.cards[card]
+            else:
+                index = self.cards.index(card)
+        except (IndexError, ValueError):
+            return None
         self.cards.remove(card)
+        return card
 
     def append_card(self, card):
         """Add card to end of cards holder. Does not sort.
@@ -139,6 +165,10 @@ class CardHolder(DataModelController):
         self._update_model_collection('cards', {'action': 'append'})
         return self.card_count - 1
 
+    def append_cards(self, cards):
+        for c in cards:
+            self.append_card(c)
+
     def insert_card(self, card, index=None):
         """Insert card in specified index, or sorted order.
 
@@ -148,16 +178,16 @@ class CardHolder(DataModelController):
         :param card: Card -- The card object to insert
         :return: int -- The index of the new card.
         """
-        if not self.card_count:
+        if not self.has_cards:
             return self.append_card(card)
         if index is None:
-            if not self.sort_compare:
+            if not self.sort_method:
                 raise IndexError("No compare method set for CardHolder. "
                                  "Index required.")
             index = 0
-            comp = self.__class__.SORT_COMP_METHODS[self.sort_compare]
+            comp = self.__class__.SORT_COMP_METHODS[self.sort_method]
             comp_val = 1 if self.sort_ascend else -1
-            while comp(card, self.cards[index]) == comp_val:
+            while index < self.card_count and comp(card, self.cards[index]) == comp_val:
                 index += 1
         self.cards.insert(index, card)
         self._update_model_collection('cards', {'action': 'insert',
@@ -166,10 +196,10 @@ class CardHolder(DataModelController):
 
     def sort(self):
         """Sorts cards list."""
-        if not self.compare:
+        if not self.sort_method:
             raise AttributeError("No compare method set for CardHolder; "
                                  "cannot sort.")
-        self.cards.sort(self.__class__.SORT_COMP_METHODS[self.sort_compare])
+        self.cards.sort(self.__class__.SORT_COMP_METHODS[self.sort_method])
         self._update_model('cards')
 
     def shuffle(self):

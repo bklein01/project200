@@ -8,9 +8,11 @@ Exports:
 
 """
 
+from combomethod import combomethod
 from core.datamodel import DataModelController, DataModel
 from core.decorators import classproperty
 from game.deck import CardHolder
+from store.user import User
 
 
 class Spectator(DataModelController):
@@ -18,6 +20,10 @@ class Spectator(DataModelController):
 
     Class Properties:
         :type MODEL_RULES: dict -- The rule set for the underlying `DataModel`.
+
+    Class Methods:
+        load -- Load new Game object from existing DataModel.
+        get -- Load new Game object from existing game_id.
 
     Init Parameters:
         user -- The `User` object.
@@ -35,18 +41,30 @@ class Spectator(DataModelController):
             :key name: str -- The profile name of the user.
             :key user: DataModel -- The user data.
         """
-        return {
+        rules = super(Spectator, cls).MODEL_RULES
+        rules.update({
             'name': ('name', str, None),
-            'user': ('user', DataModel, lambda x: x.model)
-        }
+            'user_id': ('user', str, lambda x: x.uid)
+        })
+        return rules
 
-    def __init__(self, user):
-        """Spectator init.
+    # noinspection PyMethodOverriding
+    @classmethod
+    def new(cls, user, data_store=None, **kwargs):
+        kwargs.update({
+            'name': user.profile_name,
+            'user': user
+        })
+        return super(Spectator, cls).new(data_store, **kwargs)
 
-        :param user: User -- The user.
-        """
-        self.name, self.user = user.profile_name, user
-        super(Spectator, self).__init__(self.__class__.MODEL_RULES)
+    @classmethod
+    def restore(cls, data_store, data_model, **kwargs):
+        kwargs.update({
+            'name': data_model.name,
+            'user': User.get(data_store, data_model.user_id)
+        })
+        return super(Spectator, cls).restore(data_store, data_model,
+                                             **kwargs)
 
 
 class Player(Spectator):
@@ -70,22 +88,67 @@ class Player(Spectator):
             :key team: str -- Player's team identifier.
             :key player_id: int -- The unique Player ID.
         """
-        old_rules = super(Player, cls).MODEL_RULES
-        old_rules['hand'] = ('hand', DataModel, lambda x: x.model)
-        old_rules['team'] = ('team', str, None)
-        old_rules['player_id'] = ('player_id', int, None)
-        return old_rules
+        rules = super(Player, cls).MODEL_RULES
+        rules.update({
+            'hand': ('hand', DataModel, lambda x: x.model),
+            'team': ('team', str, None),
+            'abandoned': ('abandoned', bool, None)
+        })
+        return rules
 
-    def __init__(self, user, team):
-        """Player init.
+    @classproperty
+    def INIT_DEFAULTS(cls):
+        defaults = super(Player, cls).INIT_DEFAULTS
+        defaults.update({
+            'abandoned': False
+        })
+        return defaults
 
-        :param user: User -- The user.
-        :param team: str -- The team identifier.
-        """
-        self.team = team
-        self.hand = CardHolder(None, 'suit')
-        self.player_id = id(self)  # TODO: Player ID generator
-        super(Player, self).__init__(user)
+    # noinspection PyMethodParameters
+    @combomethod
+    def delete_cache(rec, data_store, uid=None):
+        if isinstance(rec, Player):
+            rec.hand.delete_cache(data_store)
+        super(Player, rec).delete_cache(data_store, uid)
+
+    # noinspection PyMethodParameters
+    @combomethod
+    def delete(rec, data_store, uid=None):
+        """Delete hand controller and instance before Player."""
+        if isinstance(rec, Player):
+            rec.hand.delete(data_store)
+        super(Player, rec).delete(data_store, uid)
+
+    @classmethod
+    def restore(cls, data_store, data_model, **kwargs):
+        kwargs.update({
+            'team': data_model.team,
+            'hand': CardHolder.restore(data_store, data_model.hand),
+            'abandoned': data_model.abandoned
+        })
+        return super(Player, cls).restore(data_store, data_model, **kwargs)
+
+    # noinspection PyMethodOverriding
+    @classmethod
+    def new(cls, user, team, data_store=None, **kwargs):
+        kwargs.update({
+            'team': team,
+            'hand': CardHolder.new(None, data_store, sort_method='suit')
+        })
+        return super(Player, cls).new(user, data_store, **kwargs)
+
+    def __init__(self, *args, **kwargs):
+        super(Player, self).__init__(*args, **kwargs)
+        self.hand.on_change('*', (
+            lambda model, key, instruction:
+                self._call_listener('hand', instruction, {'property': key})))
+
+    def new_user(self, user):
+        if not self.abandoned:
+            raise ValueError('Cannot change user of unabandoned player.')
+        self.user = user
+        self.name = user.profile_name
+        self.abandoned = False
 
 # ----------------------------------------------------------------------------
 __version__ = 0.1

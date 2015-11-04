@@ -22,9 +22,9 @@ class THDeckSixes(Deck):
         std_deck = super(THDeckSixes, cls).DEFAULT_DECK
         for suit in Card.Suit:
             std_deck[suit] = [c for c in std_deck[suit]
-                              if c.value not in [Card.Value.TWO,
-                                                 Card.Value.THREE,
-                                                 Card.Value.FOUR]]
+                              if c not in [Card.Value.TWO,
+                                           Card.Value.THREE,
+                                           Card.Value.FOUR]]
         return std_deck
 
 
