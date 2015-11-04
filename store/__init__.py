@@ -87,19 +87,20 @@ class DataStore(object):
     @classmethod
     def uid(cls, doc_type):
         doc_type = cls._key(doc_type)
-        return cls
+        return cls._db.generate_uid(doc_type)
 
     @classmethod
     def get_controller(cls, doc_type, uid):
-        if not issubclass(doc_type, type):
-            raise TypeError("`doc_type` must be a type.")
+        if not issubclass(doc_type, DataModelController):
+            raise TypeError("`doc_type` must be a sub class of "
+                            "DataModelController.")
         key = cls._key(doc_type)
         ctrl = cls.get_strict_controller(key, uid)
         if not ctrl:
             model = cls.get_strict_model(key, uid)
             if not model:
                 raise ValueError("Object does not exist.")
-            ctrl = doc_type.restore(model, cls)
+            ctrl = doc_type.restore(cls, model)
         return ctrl
 
     @classmethod

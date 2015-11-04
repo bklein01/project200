@@ -7,6 +7,7 @@ Exports:
 
 """
 
+from combomethod import combomethod
 from core.datamodel import DataModelController, Collection, DataModel
 from core.dotdict import DotDict
 from core.enum import Enum
@@ -98,6 +99,29 @@ class Game(DataModelController):
         })
         return defaults
 
+    # noinspection PyMethodParameters
+    @combomethod
+    def delete_cache(rec, data_store, uid=None):
+        if isinstance(rec, Game):
+            for p in rec.players:
+                p.delete_cache(data_store)
+            for s in rec.spectators:
+                s.delete_cache(data_store)
+            rec.table.delete_cache(data_store)
+        super(Game, rec).delete_cache(data_store, uid)
+
+    # noinspection PyMethodParameters
+    @combomethod
+    def delete(rec, data_store, uid=None):
+        """Delete controller members before deleting self."""
+        if isinstance(rec, Game):
+            for p in rec.players:
+                p.delete(data_store)
+            for s in rec.spectators:
+                s.delete(data_store)
+            rec.table.delete(data_store)
+        super(Game, rec).delete(data_store, uid)
+
     # noinspection PyMethodOverriding
     @classmethod
     def new(cls, creating_user, data_store, options=None, **kwargs):
@@ -111,23 +135,20 @@ class Game(DataModelController):
     # noinspection PyMethodOverriding
     @classmethod
     def restore(cls, data_model, data_store):
-        ctrl = data_store.get_controller(cls, data_model.uid)
-        if ctrl:
-            return ctrl
         kwargs = {
             'players':
-                [Player.restore(x, data_store)
+                [Player.restore(data_store, x)
                  for x in data_model.players if x is not DataModel.Null],
             'spectators':
-                [Spectator.restore(x, data_store)
+                [Spectator.restore(data_store, x)
                  for x in data_model.spectators if x is not DataModel.Null],
             'state': data_model.state,
-            'table': (Table.restore(data_model.table, data_store)
+            'table': (Table.restore(data_store, data_model.table)
                       if data_model.table is not DataModel.Null else None),
             'points': data_model.points,
             'options': DotDict(data_model.options)
         }
-        return super(Game, cls).restore(data_model, data_store, **kwargs)
+        return super(Game, cls).restore(data_store, data_model, **kwargs)
 
     def active_players(self, team=None):
         if team:

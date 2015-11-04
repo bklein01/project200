@@ -8,6 +8,7 @@ Exports:
 
 """
 
+from combomethod import combomethod
 from core.datamodel import DataModelController, DataModel
 from core.decorators import classproperty
 from game.deck import CardHolder
@@ -47,8 +48,9 @@ class Spectator(DataModelController):
         })
         return rules
 
+    # noinspection PyMethodOverriding
     @classmethod
-    def new(cls, user, data_store, **kwargs):
+    def new(cls, user, data_store=None, **kwargs):
         kwargs.update({
             'name': user.profile_name,
             'user': user
@@ -56,16 +58,13 @@ class Spectator(DataModelController):
         return super(Spectator, cls).new(data_store, **kwargs)
 
     @classmethod
-    def restore(cls, data_model, data_store, **kwargs):
-        ctrl = data_store.get_controller(cls, data_model.uid)
-        if not ctrl:
-            kwargs.update({
-                'name': data_model.name,
-                'user': User.get(data_model.user_id, data_store)
-            })
-            ctrl = super(Spectator, cls).restore(data_model, data_store,
-                                                 **kwargs)
-        return ctrl
+    def restore(cls, data_store, data_model, **kwargs):
+        kwargs.update({
+            'name': data_model.name,
+            'user': User.get(data_store, data_model.uid)
+        })
+        return super(Spectator, cls).restore(data_store, data_model,
+                                             **kwargs)
 
 
 class Player(Spectator):
@@ -105,20 +104,33 @@ class Player(Spectator):
         })
         return defaults
 
+    # noinspection PyMethodParameters
+    @combomethod
+    def delete_cache(rec, data_store, uid=None):
+        if isinstance(rec, Player):
+            rec.hand.delete_cache(data_store)
+        super(Player, rec).delete_cache(data_store, uid)
+
+    # noinspection PyMethodParameters
+    @combomethod
+    def delete(rec, data_store, uid=None):
+        """Delete hand controller and instance before Player."""
+        if isinstance(rec, Player):
+            rec.hand.delete(data_store)
+        super(Player, rec).delete(data_store, uid)
+
     @classmethod
-    def restore(cls, data_model, data_store, **kwargs):
-        ctrl = data_store.get_controller(cls, data_model.uid)
-        if ctrl:
-            return ctrl
+    def restore(cls, data_store, data_model, **kwargs):
         kwargs.update({
             'team': data_model.team,
             'hand': CardHolder.restore(data_model.hand, data_store),
             'abandoned': data_model.abandoned
         })
-        return super(Player, cls).restore(data_model, data_store, **kwargs)
+        return super(Player, cls).restore(data_store, data_model, **kwargs)
 
+    # noinspection PyMethodOverriding
     @classmethod
-    def new(cls, user, team, data_store, **kwargs):
+    def new(cls, user, team, data_store=None, **kwargs):
         kwargs.update({
             'team': team,
             'hand': CardHolder.new(None, data_store, sort_method='suit')

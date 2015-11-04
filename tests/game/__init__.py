@@ -10,14 +10,14 @@ Exposes:
 from .. import TestCase, main
 from game import Game
 from store.user import User
-from store import ModelStore
+from store import DataStore
 
 
 class GameNoInitTestCase(TestCase):
 
     def setUp(self):
         super(GameNoInitTestCase, self).setUp()
-        self._ds = ModelStore
+        self._ds = DataStore(db_name='project200-unittest')
         self._user_generator = (
             User.new(None, 'user' + str(x), 'user@user.us', 'pw', self._ds)
             for x in xrange(1, 999))
@@ -26,7 +26,7 @@ class GameNoInitTestCase(TestCase):
     def tearDown(self):
         super(GameNoInitTestCase, self).tearDown()
         if self._creator:
-            User.delete(self._creator.uid, self._ds)
+            self._creator.force_delete(self._ds)
             self._creator = None
 
     def assertIsGameState(self, obj, state, msg=None):
@@ -60,7 +60,7 @@ class GameInitTestCase(GameNoInitTestCase):
     def tearDown(self):
         super(GameInitTestCase, self).tearDown()
         if hasattr(self, '_game') and self._game:
-            Game.delete(self._game.uid, self._ds)
+            self._game.delete(self._ds)
         self._game = None
 
 
@@ -76,7 +76,7 @@ class GameCreatedTestCase(GameInitTestCase):
         super(GameCreatedTestCase, self).tearDown()
         for u in self._users:
             if u:
-                User.delete(u.uid, self._ds)
+                u.force_delete(self._ds)
         self._users = None
 
 

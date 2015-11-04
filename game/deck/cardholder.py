@@ -87,7 +87,7 @@ class CardHolder(DataModelController):
         return defaults
 
     @classmethod
-    def restore(cls, data_model, data_store, **kwargs):
+    def restore(cls, data_store, data_model, **kwargs):
         ctrl = data_store.get_controller(cls, data_model.uid)
         if not ctrl:
             kwargs.update({
@@ -99,8 +99,9 @@ class CardHolder(DataModelController):
                                                   **kwargs)
         return ctrl
 
+    # noinspection PyMethodOverriding
     @classmethod
-    def new(cls, cards, data_store, **kwargs):
+    def new(cls, cards=None, data_store=None, **kwargs):
         if not cards:
             cards = []
         kwargs.update({

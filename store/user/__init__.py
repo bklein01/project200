@@ -7,6 +7,7 @@ Exports:
 
 """
 
+from combomethod import combomethod
 from core.datamodel import DataModelController, DataModel, Collection
 from core.enum import Enum, EnumInt
 from core.dotdict import DotDict
@@ -62,33 +63,51 @@ class User(DataModelController):
         })
         return defaults
 
-    @classmethod
-    def restore(cls, data_model, data_store, client=None, **kwargs):
-        ctrl = data_store.get_controller(cls, data_model.uid)
-        if ctrl and client:
-            ctrl.client = client
-        elif not ctrl and client:
-            kwargs.update({
-                'client': client,
-                'profile_name': data_model.profile_name,
-                'statistics': UserStatistics.restore(data_model.statistics,
-                                                     data_store),
-                'username': data_model.username,
-                'email': data_model.email,
-                'pw_hash': data_model.pw_hash,
-                'settings': data_model.settings,
-                'active_games': data_model.active_games,
-                'access': data_model.access,
-                'profile_avatar': data_model.profile_avatar,
-                'friends': data_model.friends,
-                'blocked': data_model.blocked
-            })
-            ctrl = super(User, cls).restore(data_model, data_store, **kwargs)
-        else:
-            raise ValueError("Invalid parameter configuration. `client` "
-                             "required if no pre-existing controller.")
-        return ctrl
+    # noinspection PyMethodParameters
+    @combomethod
+    def delete_cache(rec, data_store, uid=None):
+        """Delete controller member cache first."""
+        if isinstance(rec, User):
+            rec.statistics.delete_cache(data_store)
+        super(User, rec).delete_cache(data_store, uid)
 
+    # noinspection PyMethodParameters
+    @combomethod
+    def delete(rec, data_store, uid=None):
+        """Prevent user from being deleted by default."""
+        raise RuntimeError("Users should not be deleted. "
+                           "If this was intentional, use "
+                           "`User.force_delete` or `user."
+                           "force_delete`.")
+
+    # noinspection PyMethodParameters
+    @combomethod
+    def force_delete(rec, data_store, uid=None):
+        """Permanently delete User."""
+        if isinstance(rec, User):
+            rec.statistics.delete(data_store)
+        super(User, rec).delete(data_store, uid)
+
+    @classmethod
+    def restore(cls, data_store, data_model, **kwargs):
+        kwargs.update({
+            'client': data_model.client,
+            'profile_name': data_model.profile_name,
+            'statistics': UserStatistics.restore(data_store,
+                                                 data_model.statistics),
+            'username': data_model.username,
+            'email': data_model.email,
+            'pw_hash': data_model.pw_hash,
+            'settings': data_model.settings,
+            'active_games': data_model.active_games,
+            'access': data_model.access,
+            'profile_avatar': data_model.profile_avatar,
+            'friends': data_model.friends,
+            'blocked': data_model.blocked
+        })
+        return super(User, cls).restore(data_store, data_model, **kwargs)
+
+    # noinspection PyMethodOverriding
     @classmethod
     def new(cls, client, username, email, pw_hash, data_store, refer=None,
             **kwargs):

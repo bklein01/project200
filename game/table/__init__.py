@@ -8,6 +8,7 @@ Exports:
 
 """
 
+from combomethod import combomethod
 from core.datamodel import DataModelController, DataModel, Collection
 from core.enum import Enum
 from core.exceptions import StateError
@@ -91,9 +92,28 @@ class Table(DataModelController):
         })
         return defaults
 
+    # noinspection PyMethodParameters
+    @combomethod
+    def delete_cache(rec, data_store, uid=None):
+        if isinstance(rec, Table):
+            rec.deck.delete_cache(data_store)
+            rec.discards['A'].delete_cache(data_store)
+            rec.discards['B'].delete_cache(data_store)
+        super(Table, rec).delete_cache(data_store, uid)
+
+    # noinspection PyMethodParameters
+    @combomethod
+    def delete(rec, data_store, uid=None):
+        """Delete controller and datamodel from all storage."""
+        if isinstance(rec, Table):
+            rec.deck.delete(data_store)
+            rec.discards['A'].delete(data_store)
+            rec.discards['B'].delete(data_store)
+        super(Table, rec).delete(data_store, uid)
+
     # noinspection PyMethodOverriding
     @classmethod
-    def new(cls, players, deck, data_store, **kwargs):
+    def new(cls, players, deck, data_store=None, **kwargs):
         kwargs.update({'players': players,
                   'deck': deck,
                   'discards': {
@@ -101,19 +121,15 @@ class Table(DataModelController):
                       'B': CardHolder.new(None, data_store, sort_method='value')
                   }
         })
-        ctrl = super(Table, cls).new(data_store, **kwargs)
-        return ctrl
+        return super(Table, cls).new(data_store, **kwargs)
 
     # noinspection PyMethodOverriding
     @classmethod
-    def restore(cls, data_model, data_store, **kwargs):
-        ctrl = data_store.get_controller(cls, data_model.uid)
-        if ctrl:
-            return ctrl
+    def restore(cls, data_store, data_model, **kwargs):
         kwargs.update({
             'discards': {
-                'A': CardHolder.restore(data_model.discards['A'], data_store),
-                'B': CardHolder.restore(data_model.discards['B'], data_store)},
+                'A': CardHolder.restore(data_store, data_model.discards['A']),
+                'B': CardHolder.restore(data_store, data_model.discards['B'])},
             'kitty': [Card(c) if c else None for c in data_model.kitty],
             'active_cards':
                 [Card(c) if c else None for c in data_model.active],
@@ -125,10 +141,10 @@ class Table(DataModelController):
             'trump_suit': data_model.trump_suit,
             'round_start_player': data_model.round_start_player,
             'round': data_model.round,
-            'deck': Deck.restore(data_model.deck, data_store),
+            'deck': Deck.restore(data_store, data_model.deck),
             'players': data_model.players
         })
-        super(Table, cls).restore(data_model, data_store, **kwargs)
+        return super(Table, cls).restore(data_model, data_store, **kwargs)
 
     def restart(self):
         if self.state is not Table.State.END:
