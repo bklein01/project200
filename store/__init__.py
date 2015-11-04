@@ -9,8 +9,8 @@ Exports:
 
 """
 
-from .db import db
-from core.datamodel import DataModelController, DataModel
+from .db import db, DBLookupError
+from core.datamodel import DataModelController
 
 
 class ControllerCollection(object):
@@ -28,6 +28,7 @@ class ControllerCollection(object):
     def prune(self):
         while len(self._controllers) > self._max_cache:
             c = self._controllers.pop()
+            print 'Pruning: ' + repr(c)
             del self._ctrl_map[c.uid]
             self._store.save(c.__class__, c.model)
 
@@ -65,15 +66,17 @@ class DataStore(object):
     _db = None
 
     @classmethod
-    def __new__(cls, *args, **kwargs):
+    # __new__ is automatically setting both first and second args to class.
+    #   no idea why.
+    def __new__(cls, _, db_host='localhost',
+                db_port=27017,
+                db_name='zimmed-test1'):
+        if not cls._db:
+            cls._db = db(db_host, db_port, db_name)
         return cls
 
-    def __init__(self, db_host='localhsot',
-                 db_port='27017',
-                 db_name='zimmed-test1',
-                 model_transform=(lambda rules, data: DataModel(rules, data))):
-        if not self.__class__._db:
-            self.__class__._db = db(db_host, db_port, db_name, model_transform)
+    def __init__(self, *args, **kwargs):
+        pass
 
     @classmethod
     def _key(cls, doc_type):
@@ -99,7 +102,7 @@ class DataStore(object):
         if not ctrl:
             model = cls.get_strict_model(key, uid)
             if not model:
-                raise ValueError("Object does not exist.")
+                raise DBLookupError("Object does not exist: " + key + ' -- ' + uid)
             ctrl = doc_type.restore(cls, model)
         return ctrl
 
@@ -165,6 +168,7 @@ class DataStore(object):
 
     @classmethod
     def get_strict_model(cls, doc_type, uid):
+        doc_type = cls._key(doc_type)
         return cls._db.get_model(doc_type, uid)
 
 

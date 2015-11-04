@@ -61,7 +61,7 @@ class Spectator(DataModelController):
     def restore(cls, data_store, data_model, **kwargs):
         kwargs.update({
             'name': data_model.name,
-            'user': User.get(data_store, data_model.uid)
+            'user': User.get(data_store, data_model.user_id)
         })
         return super(Spectator, cls).restore(data_store, data_model,
                                              **kwargs)
@@ -123,7 +123,7 @@ class Player(Spectator):
     def restore(cls, data_store, data_model, **kwargs):
         kwargs.update({
             'team': data_model.team,
-            'hand': CardHolder.restore(data_model.hand, data_store),
+            'hand': CardHolder.restore(data_store, data_model.hand),
             'abandoned': data_model.abandoned
         })
         return super(Player, cls).restore(data_store, data_model, **kwargs)

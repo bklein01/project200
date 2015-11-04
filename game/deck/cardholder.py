@@ -72,8 +72,8 @@ class CardHolder(DataModelController):
         rules = super(CardHolder, cls).MODEL_RULES
         rules.update({
             'cards': ('cards', Collection.List(dict), lambda x: dict(x)),
-            'sort': ('sort_method', None, None),
-            'ascend': ('sort_ascend', bool, None)
+            'sort_method': ('sort_method', None, None),
+            'sort_ascend': ('sort_ascend', bool, None)
         })
         return rules
 
@@ -88,16 +88,13 @@ class CardHolder(DataModelController):
 
     @classmethod
     def restore(cls, data_store, data_model, **kwargs):
-        ctrl = data_store.get_controller(cls, data_model.uid)
-        if not ctrl:
-            kwargs.update({
-                'cards': [Card(c) for c in data_model.cards],
-                'sort_method': data_model.sort_method,
-                'sort_ascend': data_model.sort_ascend
-            })
-            ctrl = super(CardHolder, cls).restore(data_model, data_store,
-                                                  **kwargs)
-        return ctrl
+        kwargs.update({
+            'cards': [Card(c) for c in data_model.cards],
+            'sort_method': data_model.sort_method,
+            'sort_ascend': data_model.sort_ascend
+        })
+        return super(CardHolder, cls).restore(data_store, data_model,
+                                              **kwargs)
 
     # noinspection PyMethodOverriding
     @classmethod

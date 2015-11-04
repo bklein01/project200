@@ -109,7 +109,7 @@ class User(DataModelController):
 
     # noinspection PyMethodOverriding
     @classmethod
-    def new(cls, client, username, email, pw_hash, data_store, refer=None,
+    def new(cls, client, username, email, pw_hash, data_store=None, refer=None,
             **kwargs):
         if 'profile_name' not in kwargs:
             kwargs['profile_name'] = email[:email.index('@')]

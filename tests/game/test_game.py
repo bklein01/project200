@@ -9,6 +9,7 @@ from . import (GameNoInitTestCase, GameInitTestCase, GameCreatedTestCase,
                GameReadyTestCase, GameRunningTestCase)
 from core.exceptions import StateError
 from game import Game
+from store.db import DBLookupError
 
 
 class GameNewTest(GameNoInitTestCase):
@@ -91,7 +92,7 @@ class GameLoadTest(GameInitTestCase):
         self._game.delete_cache(self._ds)
         self._game = None
         # Retrieve new controller from existing model
-        _game = Game.get(uid, self._ds)
+        _game = Game.get(self._ds, uid)
         self.assertIsInstance(_game, Game,
                               "`get` Didn't retrieve Game controller.")
         self.assertEqual(_game.uid, uid,
@@ -100,42 +101,12 @@ class GameLoadTest(GameInitTestCase):
                             "Game controller didn't delete properly.")
         gid = id(_game)
         Game.delete_cache(self._ds, uid)
-        self._game = Game.load(uid, self._ds)
+        self._game = Game.load(self._ds, uid)
         self.assertIsInstance(self._game, Game,
                               "`load` Didn't retrieve Game controller.")
         self.assertEqual(self._game.uid, uid,
                          "Game controller `load` does not match uid.")
         self.assertNotEqual(gid, id(self._game),
-                            "Game controller didn't delete properly.")
-
-    def test_restore_existing(self):
-        """Tests Game.restore with existing controller."""
-        model = self._game.model
-        gid = id(self._game)
-        self._game = None
-        self._game = Game.restore(self._ds, model)
-        self.assertIsInstance(self._game, Game,
-                              "`restore` didn't retrieve Game controller.")
-        self.assertEqual(self._game.uid, model.uid,
-                         "Controller and model do not match.")
-        self.assertEqual(id(self._game), gid,
-                         "Game instances do not match.")
-        self.assertIs(model, self._game.model,
-                      "Model instances do not match")
-
-    def test_restore_stored(self):
-        """Tests Game.restore with non-existing controller."""
-        model = self._game.model
-        gid = id(self._game)
-        self._game.save(self._ds)
-        self._game.delete_cache(self._ds)
-        self._game = None
-        _game = Game.restore(self._ds, model)
-        self.assertIsInstance(_game, Game,
-                              "`restore` didn't retrieve Game controller.")
-        self.assertEqual(_game.uid, model.uid,
-                         "Controller and model do not match.")
-        self.assertNotEqual(gid, id(_game),
                             "Game controller didn't delete properly.")
 
 

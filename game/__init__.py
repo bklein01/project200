@@ -104,10 +104,12 @@ class Game(DataModelController):
     def delete_cache(rec, data_store, uid=None):
         if isinstance(rec, Game):
             for p in rec.players:
-                p.delete_cache(data_store)
+                if p:
+                    p.delete_cache(data_store)
             for s in rec.spectators:
                 s.delete_cache(data_store)
-            rec.table.delete_cache(data_store)
+            if rec.table:
+                rec.table.delete_cache(data_store)
         super(Game, rec).delete_cache(data_store, uid)
 
     # noinspection PyMethodParameters
@@ -116,10 +118,12 @@ class Game(DataModelController):
         """Delete controller members before deleting self."""
         if isinstance(rec, Game):
             for p in rec.players:
-                p.delete(data_store)
+                if p:
+                    p.delete(data_store)
             for s in rec.spectators:
                 s.delete(data_store)
-            rec.table.delete(data_store)
+            if rec.table:
+                rec.table.delete(data_store)
         super(Game, rec).delete(data_store, uid)
 
     # noinspection PyMethodOverriding
@@ -134,14 +138,14 @@ class Game(DataModelController):
 
     # noinspection PyMethodOverriding
     @classmethod
-    def restore(cls, data_model, data_store):
+    def restore(cls, data_store, data_model):
         kwargs = {
             'players':
-                [Player.restore(data_store, x)
-                 for x in data_model.players if x is not DataModel.Null],
+                [Player.restore(data_store, x) if x is not DataModel.Null
+                 else None for x in data_model.players],
             'spectators':
                 [Spectator.restore(data_store, x)
-                 for x in data_model.spectators if x is not DataModel.Null],
+                 for x in data_model.spectators],
             'state': data_model.state,
             'table': (Table.restore(data_store, data_model.table)
                       if data_model.table is not DataModel.Null else None),
@@ -244,7 +248,7 @@ class Game(DataModelController):
                             Game.State.CREATED):
             index = self.players.index(p)
             self.players[index] = None
-            Player.delete(p.uid, self._data_store)
+            p.delete(self._data_store)
             self._update_model_collection('players', {'action': 'remove',
                                                       'index': index})
             self.state = Game.State.CREATED

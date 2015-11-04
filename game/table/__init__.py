@@ -171,7 +171,7 @@ class Table(DataModelController):
         while self.deck.has_cards:
             for pid in self.players:
                 card = self.deck.deal()
-                Player.get(pid, self._data_store).hand.insert_card(card)
+                Player.get(self._data_store, pid).hand.insert_card(card)
         self._update_model('deck')
         self.state = Table.State.BETTING
         self.player_turn = self.round_start_player

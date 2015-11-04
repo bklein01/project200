@@ -3,17 +3,20 @@
 """
 
 from pymongo import MongoClient as DBClient
-from pymongo.errors import DuplicateKeyError
+from pymongo.errors import DuplicateKeyError, InvalidDocument
 import types
 import uuid
+from core.datamodel import DataModel
 
 
-def db(host='localhost', port=27017, database='zimmed_test',
-       model_transform=(lambda rules, data: data)):
+class DBLookupError(ValueError):
+    pass
+
+
+def db(host='localhost', port=27017, database='zimmed_test'):
 
     if not hasattr(db, '_database'):
         db._database = DBClient(host, port)[database]
-        db._transform = model_transform
         db.__call__ = lambda *args, **kwargs: db
 
         def generate_uid(self, collection):
@@ -22,37 +25,82 @@ def db(host='localhost', port=27017, database='zimmed_test',
                 uid = uuid.uuid4().hex
             return uid
 
+        def unparse_model(self, item):
+            if isinstance(item, dict):
+                for k, v in item.iteritems():
+                    if isinstance(v, (list, tuple, dict, DataModel)):
+                        item[k] = self.unparse_model(v)
+            elif isinstance(item, (list, set, tuple)):
+                for v in item:
+                    if isinstance(v, (list, tuple, dict, DataModel)):
+                        i = item.index(v)
+                        item[i] = self.unparse_model(v)
+            elif isinstance(item, DataModel):
+                uid = None
+                collection = None
+                if item is not DataModel.Null:
+                    uid = item.uid
+                    collection = item['_collection']
+                    self.upsert_model(collection, item)
+                return {
+                    '__sub_document__': True,
+                    '__collection__': collection,
+                    '__uid__': uid
+                }
+            return item
+
+        def parse_model(self, doc):
+            if isinstance(doc, dict):
+                doc = dict(((str(k), v) for k, v in doc.iteritems()))
+                if '__sub_document__' in doc:
+                    if not doc['__uid__']:
+                        doc = DataModel.Null
+                    else:
+                        doc = self.get_model(doc['__collection__'],
+                                             doc['__uid__'])
+                else:
+                    for k, v in doc.iteritems():
+                        if isinstance(v, (unicode, tuple, list, dict)):
+                            doc[k] = self.parse_model(v)
+            elif isinstance(doc, (tuple, list)):
+                for v in doc:
+                    if isinstance(v, (unicode, tuple, list, dict)):
+                        i = doc.index(v)
+                        doc[i] = self.parse_model(v)
+            elif isinstance(doc, unicode):
+                doc = str(doc)
+            return doc
+
         def model_to_document(self, model):
+            doc = self.unparse_model(dict(model))
             return {
-                '__rules__': model.json_rules,
-                '__data__': dict(model)
+                '_id': model.uid,
+                '__rules__': model.bson_rules,
+                '__data__': doc
             }
 
         def document_to_model(self, document):
-            return self._transform(document['__rules__'], document['__data__'])
+            data = self.parse_model(document['__data__'])
+            rules = document['__rules__']
+            return DataModel.load(rules, data)
 
         def col(self, collection):
-            if collection not in self._database.collection_names():
-                self._database[collection].create_index('uid')
+            # if collection not in self._database.collection_names():
+            #     self._database[collection].create_index('uid')
             return self._database[collection]
 
         def insert_model(self, collection, model):
-            document = {
-                '__rules__': model.json_rules,
-                '__data__': dict(model)
-            }
-            document = dict(model)
-            document['__rules__'] = model.json_rules
+            document = self.model_to_document(model)
             collection = self.col(collection)
             collection.insert_one(document)
 
         def update_model(self, collection, model):
-            document = dict(model)
+            document = self.model_to_document(model)['__data__']
             uid = document['uid']
             del document['uid']
             collection = self.col(collection)
-            collection.update_one({'uid': uid}, {
-                '$set': document
+            collection.update_one({'_id': uid}, {
+                '$set': {'__data__': document}
             })
 
         def upsert_model(self, collection, model):
@@ -75,11 +123,11 @@ def db(host='localhost', port=27017, database='zimmed_test',
 
         def get_model_data(self, collection, uid):
             collection = self.col(collection)
-            return collection.find_one({'uid': uid})
+            return collection.find_one({'_id': uid})['__data__']
 
         def get_model(self, collection, uid):
             collection = self.col(collection)
-            document = collection.find_one({'uid': uid})
+            document = collection.find_one({'_id': uid})
             if document:
                 return self.document_to_model(document)
             return None
@@ -93,7 +141,7 @@ def db(host='localhost', port=27017, database='zimmed_test',
 
         def remove_model(self, collection, uid):
             collection = self.col(collection)
-            collection.delete_one({'uid': uid})
+            collection.delete_one({'_id': uid})
 
         def remove_models(self, collection, **kwargs):
             collection = self.col(collection)
@@ -114,5 +162,7 @@ def db(host='localhost', port=27017, database='zimmed_test',
         db.get_models = types.MethodType(get_models, db)
         db.remove_model = types.MethodType(remove_model, db)
         db.remove_models = types.MethodType(remove_models, db)
+        db.parse_model = types.MethodType(parse_model, db)
+        db.unparse_model = types.MethodType(unparse_model, db)
 
     return db
