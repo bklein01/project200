@@ -5,6 +5,7 @@
 
 from . import UserLoginEventHandler
 from server import EventServer
+from server.event import SocketServerEvent
 
 
 @UserLoginEventHandler(
@@ -13,7 +14,9 @@ from server import EventServer
                    'token'
                    ))
 def signin(event):
-    user = event.auth
+    user, old_client = event.auth
     if not user:
         raise RuntimeError("No new user created during login!")
+    if old_client:
+        EventServer.emit(SocketServerEvent('force-disconnect'))
     EventServer.emit(event.ok_response(**user.filter('private')))

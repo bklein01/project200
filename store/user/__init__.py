@@ -184,6 +184,9 @@ class User(DataModelController):
             raise UnauthorizedError("Client not logged in.")
         if hash_values(client, timestamp, *args) != token:
             raise TokenInvalidError("Incorrect token provided.")
+        if user.access is User.Access.BANNED:
+            raise UnauthorizedError("User is banned.")
+        return user
 
     @classmethod
     def auth_register(cls, data_store, client, token, timestamp, username,
@@ -224,6 +227,8 @@ class User(DataModelController):
             raise UnauthorizedError("User by that name/email does not exist.")
         if hash_values(user.pw_hash, timestamp, username) != token:
             raise UnauthorizedError("Incorrect password.")
+        if user.access == User.Access.BANNED:
+            raise UnauthorizedError("User is banned.")
         return user, user.login(client)
 
     @classmethod
@@ -259,6 +264,19 @@ class User(DataModelController):
             pass
         self.client = None
 
+    def add_game(self, game_id):
+        self.active_games.append(game_id)
+        self._update_model_collection('active_games', {'action': 'append'})
+
+    def remove_game(self, id_or_index):
+        if type(id_or_index) is str:
+            index = self.active_games.index(id_or_index)
+        else:
+            index = id_or_index
+        del self.active_games[index]
+        self._update_model_collection('active_games', {'action': 'append',
+                                                       'index': index})
+
     def add_friend(self, friend_id):
         self.friends.append(friend_id)
         self._update_model_collection('friends', {'action': 'append'})
@@ -270,6 +288,19 @@ class User(DataModelController):
             index = id_or_index
         del self.friends[index]
         self._update_model_collection('friends', {'action': 'remove',
+                                                  'index': index})
+
+    def block(self, uid):
+        self.blocked.append(uid)
+        self._update_model_collection('blocked', {'action': 'append'})
+
+    def unblock(self, id_or_index):
+        if type(id_or_index) is str:
+            index = self.blocked.index(id_or_index)
+        else:
+            index = id_or_index
+        del self.blocked[index]
+        self._update_model_collection('blocked', {'action': 'remove',
                                                   'index': index})
 
 # ----------------------------------------------------------------------------

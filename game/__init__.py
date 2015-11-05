@@ -7,6 +7,7 @@ Exports:
 
 """
 
+import time
 from combomethod import combomethod
 from core.datamodel import DataModelController, Collection, DataModel
 from core.dotdict import DotDict
@@ -81,7 +82,8 @@ class Game(DataModelController):
             'points': ('points', Collection.Dict(int), None),
             'spectators': ('spectators', Collection.List(DataModel),
                            lambda x: x.model if x else DataModel.Null),
-            'options': ('options', Collection.Dict, None)
+            'options': ('options', Collection.Dict, None),
+            'last_move': ('last_move', int, lambda x: int(x))
         })
         return rules
 
@@ -131,6 +133,7 @@ class Game(DataModelController):
     def new(cls, creating_user, data_store, options=None, **kwargs):
         if not options:
             options = {}
+        kwargs['last_move'] = time.time()
         ctrl = super(Game, cls).new(data_store, **kwargs)
         ctrl.options.update(options)
         ctrl.add_player(creating_user, 0)
@@ -160,6 +163,9 @@ class Game(DataModelController):
                  if p and p.team == team and not p.abandoned])
         return len([1 for p in self.players if p and not p.abandoned])
 
+    def moved(self):
+        self.last_move = time.time()
+
     def new_game(self):
         """Start a new game.
 
@@ -181,7 +187,7 @@ class Game(DataModelController):
         self.table.on_change('state', (
             lambda model, key, instruction:
                 self._table_round_end(model)
-                if model.state is Table.State.END else 0))
+                if model.state is Table.State.END else self.moved()))
         self.table.setup()
         self.state = Game.State.RUNNING
 
@@ -214,6 +220,7 @@ class Game(DataModelController):
             self._end_game('B')
         else:
             self.table.restart()
+        self.moved()
 
     def _end_game(self, winning_team):
         losing_team = 'B' if winning_team is 'A' else 'A'
@@ -249,7 +256,7 @@ class Game(DataModelController):
             index = self.players.index(p)
             self.players[index] = None
             p.delete(self._data_store)
-            self._update_model_collection('players', {'action': 'remove',
+            self._update_model_collection('players', {'action': 'update',
                                                       'index': index})
             self.state = Game.State.CREATED
 
