@@ -19,7 +19,7 @@ class GameNoInitTestCase(TestCase):
         super(GameNoInitTestCase, self).setUp()
         self._ds = DataStore(db_name='project200-unittest')
         self._user_generator = (
-            User.new(None, 'user' + str(x), 'user@user.us', 'pw', self._ds)
+            User.new('user' + str(x), 'user@user.us', 'pw', self._ds)
             for x in xrange(1, 999))
         self._creator = self._user_generator.next()
 
