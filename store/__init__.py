@@ -59,6 +59,17 @@ class ControllerCollection(object):
         del self._ctrl_map[uid]
         self.shift_down(index)
 
+    def find(self, **kwargs):
+        for c in self._controllers:
+            ret = True
+            for k, v in kwargs.iteritems():
+                if getattr(c, k, None) != v:
+                    ret = False
+                    break
+            if ret:
+                return c
+        return None
+
 
 class DataStore(object):
 
@@ -91,6 +102,30 @@ class DataStore(object):
     def uid(cls, doc_type):
         doc_type = cls._key(doc_type)
         return cls._db.generate_uid(doc_type)
+
+    @classmethod
+    def find_id(cls, doc_type, **kwargs):
+        doc_type = cls._key(doc_type)
+        return cls._db.find_model_id(doc_type, **kwargs)
+
+    @classmethod
+    def find_controller(cls, doc_type, **kwargs):
+        doc_type = cls._key(doc_type)
+        uid = cls.find_id(doc_type, **kwargs)
+        if uid:
+            return cls.get_controller(cls, doc_type, uid)
+        return cls._CACHE[doc_type].find(**kwargs)
+
+    @classmethod
+    def find_model(cls, doc_type, **kwargs):
+        doc_type = cls._key(doc_type)
+        model = cls._db.find_model(doc_type, **kwargs)
+        if model:
+            return model
+        model = cls._CACHE[doc_type].find(**kwargs)
+        if model:
+            return model.model
+        return None
 
     @classmethod
     def get_controller(cls, doc_type, uid):

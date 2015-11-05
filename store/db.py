@@ -132,6 +132,26 @@ def db(host='localhost', port=27017, database='zimmed_test'):
                 return self.document_to_model(document)
             return None
 
+        def _find(self, collection, **kwargs):
+            collection = self.col(collection)
+            query = dict((('__data__.' + k, v) for k, v in kwargs.iteritems()))
+            document = collection.find_one(query)
+            if document:
+                return document
+            return None
+
+        def find_model(self, collection, **kwargs):
+            document = self._find(collection, **kwargs)
+            if document:
+                return self.document_to_model(document)
+            return None
+
+        def find_model_id(self, collection, **kwargs):
+            document = self._find(collection, **kwargs)
+            if document:
+                return document['__id']
+            return None
+
         def get_models(self, collection, **kwargs):
             collection = self.col(collection)
             documents = collection.find(kwargs)
@@ -158,6 +178,9 @@ def db(host='localhost', port=27017, database='zimmed_test'):
         db.upsert_models = types.MethodType(upsert_models, db)
         db.update_models = types.MethodType(update_models, db)
         db.get_model_data = types.MethodType(get_model_data, db)
+        db._find = types.MethodType(_find, db)
+        db.find_model = types.MethodType(find_model, db)
+        db.find_model_id = types.MethodType(find_model_id, db)
         db.get_model = types.MethodType(get_model, db)
         db.get_models = types.MethodType(get_models, db)
         db.remove_model = types.MethodType(remove_model, db)
