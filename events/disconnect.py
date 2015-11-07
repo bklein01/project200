@@ -4,8 +4,15 @@
 """
 
 from . import EventHandler
+from store import DataStore
+from store.user import User
 
 
 @EventHandler()
 def disconnect(event):
-    pass
+    user = User.get_user_by_client(DataStore, event.client)
+    if user:
+        user.save_session(event.client_ip)
+        user.save(DataStore)
+        user.delete_cache(DataStore)
+    # No response for disconnect.

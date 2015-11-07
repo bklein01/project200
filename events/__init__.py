@@ -9,10 +9,10 @@ Exports:
 
 """
 
-from . import *
 import importlib
 import pkgutil
 import inspect
+import logging
 from server.exception import BadRequestError
 from server.auth import auth_guest
 
@@ -22,6 +22,7 @@ def hook_events(router):
 
     :param router: EventRouter
     """
+    logging.debug("Hooking event listeners...")
     _expose_package(__name__, router)
 
 
@@ -41,23 +42,30 @@ class EventHandler(object):
 
     def __init__(self, *args, **kwargs):
         self.args_list = args
-        self.expected_data = kwargs.get('expected_data')
+        self.expected_data = kwargs.get('expected_data', None)
+        self.default_data = kwargs.get('default_data', {})
+        self.copy_data = kwargs.get('copy_data', {})
 
     def __call__(self, handler):
         def wrapped(event, *args):
+            for k, v in self.default_data.iteritems():
+                event.data[k] = event.data.get(k, v)
+            for k, v in self.copy_data.iteritems():
+                event.data[k] = event.data.get(k, event.data[v])
             if self.expected_data:
                 if not hasattr(event, 'data'):
                     raise BadRequestError('SocketEvent data expected but not '
                                           'received.')
-                for k in event.data.iterkeys():
-                    if k not in self.expected_data:
-                        raise BadRequestError('SocketEvent data key `' + k +
-                                              '` expected but not received.')
+                if any(k for k in self.expected_data
+                       if k not in event.data.iterkeys()):
+                    raise BadRequestError(
+                        'SocketEvent data keys `' + repr(self.expected_data) +
+                        '` expected but only `' +
+                        repr([k for k in event.data.iterkeys()]) + '` found.')
             event.auth = None
             if 'token' in event.data and not event.auth:
                 event.auth = self.__class__.auth(event)
             handler(event, *args)
-            handler.next(event)
         wrapped.args_list = self.args_list
         wrapped.event_handler = True
         return wrapped
@@ -69,7 +77,8 @@ def _add_events(module, name, router):
                  if (inspect.isfunction(item[1]) and
                      hasattr(item[1], 'event_handler'))]
     for key, func in functions:
-        if key is '__default__' or key is module.__name__:
+        module_name = module.__name__.split('.')[-1]
+        if key == '__default__' or key == module_name:
             event = ''
         else:
             event = '-' + key.replace('_', '-')
@@ -89,8 +98,9 @@ def _expose_package(package_name, router):
     :param router: EventRouter -- The router to hook into.
     """
     package = importlib.import_module(package_name)
-    for loader, name, is_pkg in pkgutil.walk_packages(package.__path__):
-        full_name = package_name + '.' + name
+    for loader, name, is_pkg in pkgutil.walk_packages(package.__path__,
+                                                      package_name + '.'):
+        full_name = name
         module = importlib.import_module(full_name)
         _add_events(module, full_name, router)
         if is_pkg:

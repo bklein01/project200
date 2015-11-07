@@ -2,24 +2,23 @@
 
 """
 
-from server.event import (SocketServerEvent,
-                          SocketConnectEvent,
-                          SocketDisconnectEvent)
-from server.router import EventRouter
-from server import EventServer
-from store import DataStore
-from store.user import User
 import sys
-
-user_map = {}
+from server import EventServer
+from server.router import EventRouter
+from events import hook_events
+import logging
 
 
 def main():
+    logging.basicConfig(level=logging.DEBUG)
+    hook_events(EventRouter)
+    EventServer.start()
+    EventRouter.listen_sync(EventServer)
+    return EventServer.stop()
 
-    EventRouter.on('connect')
-
+if __name__ == '__main__':
     try:
-        EventRouter.listen_sync(empty=EventServer.is_empty,
-                                get=EventServer.get_event)
+        sys.exit(main())
     except KeyboardInterrupt:
-        sys.exit(0)
+        print 'Standard shutdown failed. Using fail-safe shutdown.'
+        sys.exit(1)

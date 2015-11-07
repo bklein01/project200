@@ -19,4 +19,8 @@ def signin(event):
         raise RuntimeError("No new user created during login!")
     if old_client:
         EventServer.emit(SocketServerEvent('force-disconnect'))
-    EventServer.emit(event.ok_response(**user.filter('private')))
+
+    data = user.filter('private')
+    if event.data.get('remember', False):
+        data['cookie'] = user.generate_cookie(event.client_ip)
+    EventServer.emit(event.ok_response(**data), event.client)

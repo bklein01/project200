@@ -1,8 +1,9 @@
 from store.user import User
-from store import ModelStore as DataStore
+from store import DataStore
 from game import Game
 from core.dotdict import DotDict
 from server import EventServer
+from server.router import EventRouter
 import sys
 
 
@@ -14,18 +15,12 @@ def prnt(obj, k):
 
 def server_main():
     print "Starting server..."
-    EventServer.start()
+    EventServer.start(log_level=10)
     try:
-        while True:
-            if EventServer.has_events:
-                event = EventServer.get_event()
-                print str(event)
-                if event.type is 'exit':
-                    break
-    except Exception as e:
-        print e
-    EventServer.stop()
-    sys.exit(0)
+        EventRouter.listen_sync(EventServer)
+    except KeyboardInterrupt:
+        print '\nFinsihed.\n'
+    return EventServer
 
 def game_main():
     users = DotDict({

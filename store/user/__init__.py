@@ -8,6 +8,7 @@ Exports:
 """
 
 import re
+import time
 from combomethod import combomethod
 from core.datamodel import DataModelController, DataModel, Collection
 from core.enum import Enum, EnumInt
@@ -53,7 +54,8 @@ class User(DataModelController):
             'profile_avatar': ('profile_avatar', None, None),
             'access': ('access', int, None),
             'statistics': ('statistics', DataModel, lambda x: x.model),
-            'activated': ('activated', bool, None)
+            'activated': ('activated', bool, None),
+            'last_session': ('last_session', tuple, None)
         })
         return rules
 
@@ -87,7 +89,8 @@ class User(DataModelController):
             'profile_name': 'Newbie',
             'access': User.Access.BASIC,
             'profile_avatar': '',
-            'settings': cls.DEFAULT_SETTINGS
+            'settings': cls.DEFAULT_SETTINGS,
+            'last_session': ()
         })
         return defaults
 
@@ -134,7 +137,8 @@ class User(DataModelController):
             'profile_avatar': data_model.profile_avatar,
             'friends': data_model.friends,
             'blocked': data_model.blocked,
-            'activated': data_model.activated
+            'activated': data_model.activated,
+            'last_session': data_model.last_session
         })
         ctrl = super(User, cls).restore(data_store, data_model, **kwargs)
         for k, v in cls._client_to_user_map.iteritems():
@@ -242,6 +246,23 @@ class User(DataModelController):
             pass
         return user
 
+    @classmethod
+    def restore_session(cls, client, ip, uid, token, data_store):
+        user = cls.get(data_store, uid)
+        exp = user.last_session[1]
+        if time.time() > exp:
+            user.last_session = ()
+            return None
+        if user.last_session[0] != ip:
+            return None
+        if token != hash_values(user.pw_hash, ip, uid):
+            return None
+        user.login(client)
+        return user
+
+    def save_session(self, ip, timeout_seconds=60):
+        self.last_session = (ip, time.time() + timeout_seconds)
+
     def update_settings(self, **kwargs):
         for k, v in kwargs.iteritems():
             if k in self.settings and self.settings[k] == v:
@@ -251,9 +272,14 @@ class User(DataModelController):
                                                        'key': k})
 
     def login(self, client):
+        if self.client == client:
+            return None
         old_client = self.client
         self.client = client
-        store = self if self._data_store else self.uid
+        if (old_client and old_client in
+                self.__class__._client_to_user_map.iterkeys()):
+            del self.__class__._client_to_user_map[old_client]
+        store = self if not self._data_store else self.uid
         self.__class__._client_to_user_map[client] = store
         return old_client
 

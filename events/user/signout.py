@@ -9,14 +9,18 @@ from store import DataStore
 
 
 @UserRequestEventHandler(
-    expected_data=('salt',
-                   'timestamp',
-                   'token'
-                   ))
+    default_data={
+        'salt': "user-signout"
+    },
+    expected_data=(
+            'salt',
+            'timestamp',
+            'token'
+    ))
 def signout(event):
     user = event.auth
     if not user:
         raise RuntimeError("No user retrieved during logout process!")
     user.save(DataStore)
     user.delete_cache(DataStore)
-    EventServer.emit(event.ok_response())
+    EventServer.emit(event.ok_response(), event.client)
