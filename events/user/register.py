@@ -20,6 +20,6 @@ def register(event):
     if not user:
         raise RuntimeError("No new user created during registration!")
     user.update_settings(
-        receive_promo_emails=event.data.get('promotion', False))
+        receive_promo_emails=event.data.get('promotion', True))
     EventServer.emit(event.ok_response(username=user.username), event.client)
     user.delete_cache(DataStore)

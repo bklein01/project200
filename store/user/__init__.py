@@ -218,6 +218,8 @@ class User(DataModelController):
     @classmethod
     def auth_login(cls, data_store, client, token, timestamp, username):
         timeout_check(timestamp)
+        if not re.match('/[a-zA-Z0-9\._\-]{4,24}/', username):
+            raise BadRequestError("Invalid username or email.")
         email = False
         if '@' in username:
             email = True
@@ -255,7 +257,7 @@ class User(DataModelController):
             return None
         if user.last_session[0] != ip:
             return None
-        if token != hash_values(user.pw_hash, ip, uid):
+        if token != hash_values(user.pw_hash, client, uid):
             return None
         user.login(client)
         return user

@@ -7,9 +7,11 @@ from server import EventServer
 from server.router import EventRouter
 from events import hook_events
 import logging
+from store import DataStore
 
 
 def main():
+    DataStore()
     logging.basicConfig(level=logging.DEBUG)
     hook_events(EventRouter)
     EventServer.start()

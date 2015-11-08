@@ -58,6 +58,7 @@ class EventHandler(object):
                                           'received.')
                 if any(k for k in self.expected_data
                        if k not in event.data.iterkeys()):
+                    logging.debug(repr(event.data))
                     raise BadRequestError(
                         'SocketEvent data keys `' + repr(self.expected_data) +
                         '` expected but only `' +

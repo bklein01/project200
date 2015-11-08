@@ -18,7 +18,7 @@ def signin(event):
     if not user:
         raise RuntimeError("No new user created during login!")
     if old_client:
-        EventServer.emit(SocketServerEvent('force-disconnect'))
+        EventServer.emit(SocketServerEvent('force-disconnect'), old_client)
 
     data = user.filter('private')
     if event.data.get('remember', False):

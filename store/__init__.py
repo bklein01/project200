@@ -113,8 +113,10 @@ class DataStore(object):
         doc_type = cls._key(doc_type)
         uid = cls.find_id(doc_type, **kwargs)
         if uid:
-            return cls.get_controller(cls, doc_type, uid)
-        return cls._CACHE[doc_type].find(**kwargs)
+            return cls.get_controller(cls, uid)
+        if doc_type in cls._CACHE.iterkeys():
+            return cls._CACHE[doc_type].find(**kwargs)
+        return None
 
     @classmethod
     def find_model(cls, doc_type, **kwargs):
@@ -122,7 +124,10 @@ class DataStore(object):
         model = cls._db.find_model(doc_type, **kwargs)
         if model:
             return model
-        model = cls._CACHE[doc_type].find(**kwargs)
+        if doc_type not in cls._CACHE.iterkeys():
+            model = None
+        else:
+            model = cls._CACHE[doc_type].find(**kwargs)
         if model:
             return model.model
         return None
